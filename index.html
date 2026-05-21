@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>身體年齡評估 · HealthAge</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#f5f7f4; --surface:#ffffff; --surface2:#eef2ea; --border:#dbe5d4;
+  --accent:#2d6a4f; --accent2:#52b788; --accent3:#f4a261; --warn:#e63946;
+  --ink:#1a2e22; --text:#2d3e35; --text2:#5a7060; --text3:#8fa898;
+  --ex:#2d6a4f; --go:#2f80ed; --fa:#d97706; --po:#e63946;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Sora','Noto Sans TC',sans-serif;min-height:100vh;overflow-x:hidden;}
+
+/* HERO */
+.hero{background:linear-gradient(135deg,#1a2e22 0%,#2d6a4f 55%,#52b788 100%);padding:44px 24px 60px;text-align:center;position:relative;overflow:hidden;}
+.hero::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 36px,rgba(255,255,255,0.03) 36px,rgba(255,255,255,0.03) 37px);pointer-events:none;}
+.hero-tag{display:inline-block;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:999px;padding:5px 16px;font-size:11px;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,.9);text-transform:uppercase;margin-bottom:20px;}
+.hero h1{font-size:clamp(32px,7vw,60px);font-weight:800;color:#fff;line-height:1.05;margin-bottom:16px;}
+.hero h1 em{color:#9be15d;font-style:normal;}
+.hero-sub{font-size:15px;color:rgba(255,255,255,.72);max-width:500px;margin:0 auto 26px;line-height:1.75;}
+.hero-pills{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;}
+.hero-pill{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:999px;padding:5px 14px;font-size:12px;color:rgba(255,255,255,.8);font-weight:600;}
+
+/* WIZARD SHELL */
+.wizard{max-width:820px;margin:0 auto;padding:0 18px 80px;}
+
+/* STEP NAV */
+.step-nav{display:flex;gap:4px;margin:28px 0 20px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:5px;box-shadow:0 2px 14px rgba(45,106,79,.07);}
+.step-tab{flex:1;display:flex;align-items:center;gap:9px;padding:11px 14px;border-radius:12px;cursor:pointer;transition:all .2s;border:none;background:transparent;font-family:'Sora','Noto Sans TC',sans-serif;}
+.step-tab.active{background:var(--accent);box-shadow:0 4px 16px rgba(45,106,79,.28);}
+.step-tab.done{background:rgba(82,183,136,.1);}
+.step-num{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:var(--surface2);color:var(--text3);flex-shrink:0;transition:all .2s;}
+.step-tab.active .step-num{background:rgba(255,255,255,.25);color:#fff;}
+.step-tab.done .step-num{background:var(--accent2);color:#fff;}
+.step-lbl{font-size:10px;font-weight:800;color:var(--text3);display:block;letter-spacing:.06em;white-space:nowrap;}
+.step-tab.active .step-lbl{color:rgba(255,255,255,.75);}
+.step-tab.done .step-lbl{color:var(--accent);}
+.step-ttl{font-size:13px;font-weight:700;color:var(--ink);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.step-tab.active .step-ttl{color:#fff;}
+
+/* PROGRESS */
+.prog-wrap{height:3px;background:var(--border);border-radius:2px;margin-bottom:22px;overflow:hidden;}
+.prog-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .5s ease;}
+
+/* STEP PAGES */
+.step-page{display:none;animation:fadeUp .3s ease;}
+.step-page.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+
+/* SECTION */
+.sect{margin-bottom:22px;}
+.sect-title{font-size:16px;font-weight:800;color:var(--ink);margin-bottom:5px;display:flex;align-items:center;gap:8px;}
+.sect-note{font-size:13px;color:var(--text3);line-height:1.7;margin-bottom:14px;}
+.opt-badge{font-size:10px;font-weight:700;background:rgba(82,183,136,.12);color:var(--accent);border-radius:999px;padding:2px 8px;}
+
+/* INPUT GRID */
+.ig{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;}
+.igroup{background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:13px 15px;transition:border-color .2s,box-shadow .2s;}
+.igroup:focus-within{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(82,183,136,.13);}
+.ilbl{display:block;font-size:10px;font-weight:800;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px;}
+.irow{display:flex;align-items:center;gap:7px;}
+.irow input,.irow select{flex:1;background:transparent;border:none;outline:none;color:var(--ink);font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;min-width:0;}
+.irow select{cursor:pointer;appearance:none;-webkit-appearance:none;font-size:15px;}
+.irow select option{background:var(--surface);color:var(--ink);}
+.irow input::placeholder{color:var(--text3);font-size:13px;font-weight:400;}
+.irow input:out-of-range{border:1.5px solid var(--warn);background:rgba(230,57,70,.05);}
+.irow input:out-of-range+.iunit{color:var(--warn);}
+.igroup:has(input:out-of-range){border-color:var(--warn);}
+.igroup:has(input:out-of-range)::after{content:'數值超出範圍';display:block;font-size:10px;color:var(--warn);font-weight:700;margin-top:4px;}
+.iunit{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text3);white-space:nowrap;}
+.ihint{font-size:11px;color:var(--text3);margin-top:4px;line-height:1.5;}
+
+/* DEVICE NOTE */
+.dev-note{margin-top:9px;padding:9px 11px;background:rgba(244,162,97,.08);border:1px solid rgba(244,162,97,.22);border-left:3px solid var(--accent3);border-radius:8px;font-size:12px;color:var(--text2);line-height:1.6;}
+
+/* EXERCISE */
+.ex-block{background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:15px;margin-bottom:9px;}
+.ex-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;}
+.ex-title{font-size:12px;font-weight:800;color:var(--text2);letter-spacing:.06em;}
+.rm-btn{background:transparent;border:1px solid var(--border);border-radius:999px;color:var(--text3);font-size:12px;padding:3px 10px;cursor:pointer;transition:all .15s;font-family:'Sora','Noto Sans TC',sans-serif;}
+.rm-btn:hover{border-color:var(--warn);color:var(--warn);}
+.ex-row{display:grid;grid-template-columns:1fr 72px 84px 80px;gap:9px;align-items:end;}
+.ex-row>div{display:flex;flex-direction:column;gap:4px;}
+.ex-clbl{font-size:9px;font-weight:800;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;}
+.ex-row select,.ex-row input{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:7px 9px;color:var(--ink);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;outline:none;width:100%;transition:border-color .15s;appearance:none;-webkit-appearance:none;}
+.ex-row select:focus,.ex-row input:focus{border-color:var(--accent2);}
+.ex-row select option{background:var(--surface);}
+.walk-row{display:none;margin-top:11px;padding:11px 13px;background:rgba(82,183,136,.07);border-radius:9px;border-left:3px solid var(--accent2);}
+.ex-sum{font-size:12px;color:var(--accent);font-family:'JetBrains Mono',monospace;font-weight:700;margin-top:9px;padding:7px 11px;background:rgba(82,183,136,.08);border-radius:8px;display:none;}
+
+/* FUNCTIONAL FITNESS */
+.func-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:9px;margin-top:9px;}
+.func-card{background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:13px 10px;cursor:pointer;transition:all .18s;text-align:center;}
+.func-card:hover{border-color:var(--accent2);}
+.func-card.sel{border-color:var(--accent);background:rgba(45,106,79,.06);}
+.func-icon{font-size:22px;margin-bottom:5px;display:block;}
+.func-lbl{font-size:12px;font-weight:700;color:var(--ink);}
+.func-desc{font-size:11px;color:var(--text3);margin-top:2px;}
+
+/* SMOKING DETAIL */
+.smoke-det{display:none;margin-top:11px;padding:13px;background:rgba(230,57,70,.05);border:1px solid rgba(230,57,70,.16);border-left:3px solid var(--warn);border-radius:10px;}
+.quit-det{display:none;margin-top:11px;padding:13px;background:rgba(244,162,97,.07);border:1px solid rgba(244,162,97,.2);border-left:3px solid var(--accent3);border-radius:10px;}
+
+/* NAV BUTTONS */
+.nav-btns{display:flex;gap:11px;margin-top:26px;}
+.btn-p{flex:1;padding:15px;background:linear-gradient(135deg,#1a2e22,#2d6a4f);border:none;border-radius:13px;color:#fff;font-size:15px;font-weight:800;cursor:pointer;transition:all .2s;font-family:'Sora','Noto Sans TC',sans-serif;box-shadow:0 7px 22px rgba(45,106,79,.24);}
+.btn-p:hover{transform:translateY(-2px);box-shadow:0 11px 30px rgba(45,106,79,.32);}
+.btn-s{padding:15px 18px;background:var(--surface);border:1.5px solid var(--border);border-radius:13px;color:var(--text2);font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;font-family:'Sora','Noto Sans TC',sans-serif;}
+.btn-s:hover{border-color:var(--text2);color:var(--ink);}
+
+/* RESULTS */
+.result-panel{display:none;}
+.result-panel.show{display:block;animation:fadeUp .45s ease;}
+
+/* RESULT HERO */
+.res-hero{background:linear-gradient(135deg,#1a2e22,#2d6a4f);border-radius:22px;padding:34px 26px;color:#fff;text-align:center;margin-bottom:18px;position:relative;overflow:hidden;}
+.res-hero::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 28px,rgba(255,255,255,0.03) 28px,rgba(255,255,255,0.03) 29px);pointer-events:none;}
+.res-lbl{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:7px;}
+.res-age{font-size:clamp(76px,17vw,118px);font-weight:800;line-height:1;color:#fff;}
+.res-range{font-family:'JetBrains Mono',monospace;font-size:13px;color:rgba(255,255,255,.55);margin-bottom:10px;}
+.res-diff{display:inline-block;padding:7px 18px;border-radius:999px;font-size:14px;font-weight:800;background:rgba(155,225,93,.2);color:#c8ff7a;margin-bottom:20px;}
+.res-diff.older{background:rgba(230,57,70,.2);color:#ffb3b7;}
+.res-meta{display:flex;justify-content:center;gap:30px;flex-wrap:wrap;}
+.res-m .v{font-size:26px;font-weight:800;color:#9be15d;}
+.res-m .l{font-size:11px;color:rgba(255,255,255,.5);margin-top:2px;}
+
+/* CARDS */
+.body-type-card{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:17px 20px;margin-bottom:16px;box-shadow:0 2px 10px rgba(45,106,79,.05);}
+.bt-lbl{font-size:11px;font-weight:800;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;}
+.bt-type{font-size:20px;font-weight:800;color:var(--ink);margin-bottom:5px;}
+.bt-desc{font-size:14px;color:var(--text2);line-height:1.6;}
+
+.rank-card{display:grid;grid-template-columns:minmax(150px,.55fr) 1fr;gap:14px;background:var(--surface);border:1.5px solid var(--border);border-radius:18px;padding:18px;margin-bottom:18px;box-shadow:0 2px 10px rgba(45,106,79,.05);}
+.rank-main{background:#1a2e22;border-radius:13px;padding:17px;color:#fff;text-align:center;}
+.rank-lbl{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:5px;}
+.rank-pct{font-size:clamp(44px,9vw,64px);font-weight:800;line-height:1;}
+.rank-pct span{font-size:18px;color:#9be15d;}
+.rank-sub{font-size:11px;color:rgba(255,255,255,.55);margin-top:5px;line-height:1.5;}
+.rank-copy{display:flex;flex-direction:column;justify-content:center;gap:7px;font-size:13px;color:var(--text2);line-height:1.7;}
+.rank-note{font-size:11px;color:var(--text3);}
+
+/* PRIORITY GRID */
+.pri-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:11px;margin-bottom:18px;}
+.pri-card{background:var(--surface);border:1.5px solid var(--border);border-radius:13px;padding:15px 17px;box-shadow:0 2px 10px rgba(45,106,79,.04);}
+.pri-card h3{font-size:10px;font-weight:800;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:11px;}
+.pri-card ul{list-style:none;display:grid;gap:7px;}
+.pri-card li{color:var(--text2);font-size:13px;line-height:1.55;padding-left:13px;position:relative;}
+.pri-card li::before{content:'›';position:absolute;left:0;color:var(--accent);font-weight:800;}
+
+/* SCORE GRID */
+.sc-ttl{font-size:11px;font-weight:800;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;margin-top:18px;}
+.sc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:9px;margin-bottom:18px;}
+.sc-card{background:var(--surface);border:1.5px solid var(--border);border-left:4px solid var(--border);border-radius:13px;padding:13px 15px;box-shadow:0 2px 7px rgba(45,106,79,.04);transition:transform .15s;}
+.sc-card:hover{transform:translateY(-2px);}
+.sc-card.excellent{border-left-color:var(--ex);}
+.sc-card.good{border-left-color:var(--go);}
+.sc-card.fair{border-left-color:var(--fa);}
+.sc-card.poor{border-left-color:var(--po);}
+.sc-metric{font-size:10px;font-weight:800;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;}
+.sc-value{font-size:21px;font-weight:800;color:var(--ink);margin-bottom:3px;}
+.sc-age{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2);line-height:1.5;}
+.sc-badge{display:inline-block;margin-top:5px;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800;}
+.sc-badge.excellent{background:rgba(45,106,79,.1);color:var(--ex);}
+.sc-badge.good{background:rgba(47,128,237,.1);color:var(--go);}
+.sc-badge.fair{background:rgba(217,119,6,.1);color:var(--fa);}
+.sc-badge.poor{background:rgba(230,57,70,.1);color:var(--po);}
+.sc-corr{margin-top:7px;padding:6px 8px;background:rgba(244,162,97,.08);border-left:3px solid var(--accent3);border-radius:6px;font-size:11px;color:var(--text2);line-height:1.55;}
+
+/* BAR CHART */
+.bar-sec{background:var(--surface);border:1.5px solid var(--border);border-radius:15px;padding:20px;margin-bottom:18px;box-shadow:0 2px 10px rgba(45,106,79,.04);}
+.bar-sec-ttl{font-size:11px;font-weight:800;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px;}
+.bar-row{display:flex;align-items:center;gap:11px;margin-bottom:12px;}
+.bar-lbl{font-size:12px;color:var(--text2);font-weight:600;min-width:96px;text-align:right;}
+.bar-track{flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:4px;transition:width 1s cubic-bezier(.4,0,.2,1);width:0;}
+.bar-right{display:flex;flex-direction:column;align-items:flex-end;min-width:58px;}
+.bar-age{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;}
+.bar-meta{font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace;text-align:right;}
+
+/* ADVICE */
+.adv-sec{background:var(--surface);border:1.5px solid var(--border);border-radius:15px;padding:20px;margin-bottom:18px;box-shadow:0 2px 10px rgba(45,106,79,.04);}
+.adv-item{display:flex;gap:11px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text2);line-height:1.65;}
+.adv-item:last-child{border-bottom:none;}
+.adv-dot{width:7px;height:7px;border-radius:50%;margin-top:7px;flex-shrink:0;}
+.adv-dot.good{background:var(--ex);}
+.adv-dot.warn{background:var(--accent3);}
+.adv-dot.bad{background:var(--po);}
+
+/* SCORE METER */
+.sc-meter{background:var(--surface);border:1.5px solid var(--border);border-radius:15px;padding:20px;margin-bottom:18px;box-shadow:0 2px 10px rgba(45,106,79,.04);}
+.sc-row{display:flex;align-items:center;gap:14px;margin-top:11px;}
+.sc-big{font-family:'JetBrains Mono',monospace;font-size:50px;font-weight:700;color:var(--accent);min-width:75px;}
+.sc-track{flex:1;height:9px;background:var(--surface2);border-radius:5px;overflow:hidden;}
+.sc-fill{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width 1.2s cubic-bezier(.4,0,.2,1);width:0;}
+
+/* SHARE */
+.share-row{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap;}
+.shr-btn{padding:11px 18px;border-radius:11px;font-size:13px;font-weight:800;cursor:pointer;border:1.5px solid var(--border);background:var(--surface);color:var(--text2);transition:all .15s;font-family:'Sora','Noto Sans TC',sans-serif;}
+.shr-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(45,106,79,.05);}
+.shr-btn.pri{background:var(--accent);border-color:var(--accent);color:#fff;}
+.shr-btn.pri:hover{background:#255a42;}
+.reset-btn{width:100%;padding:13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:13px;color:var(--text2);font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;margin-top:10px;font-family:'Sora','Noto Sans TC',sans-serif;}
+.reset-btn:hover{border-color:var(--text2);color:var(--ink);}
+.ref-note{border-top:1px solid var(--border);margin-top:13px;padding-top:11px;font-size:11px;color:var(--text3);line-height:1.7;}
+
+/* COLLAPSIBLE ARROW ACTIVE */
+.sect-title.open > span[id$="Arrow"], span[id$="Arrow"].open { transform: rotate(90deg); display:inline-block; }
+
+@media(max-width:600px){
+  .step-tab .step-ttl{display:none;}
+  .ex-row{grid-template-columns:1fr 1fr;}
+  .ex-row>div:first-child{grid-column:1/-1;}
+  .rank-card{grid-template-columns:1fr;}
+  .bar-row{display:grid;grid-template-columns:1fr auto;gap:5px 9px;}
+  .bar-lbl{text-align:left;min-width:0;}
+  .bar-track{grid-column:1/-1;order:3;}
+  .bar-right{order:2;}
+  .bar-meta{grid-column:1/-1;order:4;text-align:left;}
+  /* Mobile text size bumps */
+  .ilbl{font-size:12px;}
+  .ihint{font-size:12px;}
+  .sect-note{font-size:14px;}
+  .irow input,.irow select{font-size:18px;}
+  .func-lbl{font-size:13px;}
+  .func-desc{font-size:12px;}
+  .sc-metric{font-size:11px;}
+  .sc-value{font-size:20px;}
+  .sc-age,.sc-badge{font-size:12px;}
+  .adv-item{font-size:14px;}
+  .ref-note{font-size:12px;}
+  .pri-card li{font-size:14px;}
+  .bar-lbl{font-size:13px;}
+}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-tag">Health Age Assessment</div>
+  <h1>你的身體<em>幾歲</em>？</h1>
+  <p class="hero-sub">填越多越準確，但只填基本資料也能得到有意義的評估。3分鐘，了解真實健康狀態。</p>
+  <div class="hero-pills">
+    <span class="hero-pill">📊 18+ 項指標</span>
+    <span class="hero-pill">🔧 裝置誤差自動校正</span>
+    <span class="hero-pill">🇹🇼 台灣同齡排名</span>
+    <span class="hero-pill">📋 可複製結果摘要</span>
+  </div>
+</div>
+
+<div class="wizard">
+  <!-- STEP NAV -->
+  <div class="step-nav">
+    <button class="step-tab active" onclick="goStep(1)" id="tab1">
+      <div class="step-num" id="sn1">1</div>
+      <div><span class="step-lbl">必填</span><span class="step-ttl">基本 &amp; 體態</span></div>
+    </button>
+    <button class="step-tab" onclick="goStep(2)" id="tab2">
+      <div class="step-num" id="sn2">2</div>
+      <div><span class="step-lbl">建議填</span><span class="step-ttl">心血管 &amp; 睡眠</span></div>
+    </button>
+    <button class="step-tab" onclick="goStep(3)" id="tab3">
+      <div class="step-num" id="sn3">3</div>
+      <div><span class="step-lbl">加分項</span><span class="step-ttl">運動 &amp; 生活</span></div>
+    </button>
+  </div>
+  <div class="prog-wrap"><div class="prog-fill" id="progBar" style="width:33%"></div></div>
+
+  <!-- STEP 1 -->
+  <div class="step-page active" id="step1">
+    <div class="sect">
+      <div class="sect-title">👤 基本資料</div>
+      <p class="sect-note">至少填年齡、性別、身高、體重。BMI自動計算，其他不知道可略過。</p>
+      <div class="ig">
+        <div class="igroup"><label class="ilbl">實際年齡</label><div class="irow"><input type="number" id="age" placeholder="35" min="15" max="90" inputmode="numeric"><span class="iunit">歲</span></div></div>
+        <div class="igroup"><label class="ilbl">性別</label><div class="irow"><select id="gender"><option value="male">男性</option><option value="female">女性</option></select></div></div>
+        <div class="igroup"><label class="ilbl">身高</label><div class="irow"><input type="number" id="height" placeholder="170" min="140" max="220" inputmode="decimal" oninput="autoBmi()"><span class="iunit">cm</span></div></div>
+        <div class="igroup"><label class="ilbl">體重</label><div class="irow"><input type="number" id="weight" placeholder="65" step="0.1" min="35" max="180" inputmode="decimal" oninput="autoBmi()"><span class="iunit">kg</span></div></div>
+        <div class="igroup" style="grid-column:span 2;">
+          <label class="ilbl">腰圍 <span class="opt-badge">選填</span></label>
+          <div class="irow"><input type="number" id="waist" placeholder="80" step="0.5" min="50" max="140" inputmode="decimal" oninput="clearPants()"><span class="iunit">cm</span></div>
+          <p class="ihint">男≥90 / 女≥80 為健康警戒線</p>
+          <div style="margin-top:10px;padding:10px 12px;background:var(--surface2);border-radius:10px;border-left:3px solid var(--accent2);">
+            <div class="ex-clbl" style="margin-bottom:7px;">不知道腰圍？用褲子腰圍換算</div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <label style="font-size:12px;color:var(--text2);">褲子腰圍</label>
+                <input type="number" id="pantsSize" placeholder="32" min="24" max="50" step="1" oninput="convertPants()"
+                  style="width:68px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 9px;color:var(--ink);font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;outline:none;">
+                <span style="font-size:12px;color:var(--text2);">吋</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <label style="font-size:12px;color:var(--text2);">或公分</label>
+                <input type="number" id="pantsCm" placeholder="82" min="60" max="130" step="1" oninput="convertPantsCm()"
+                  style="width:68px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 9px;color:var(--ink);font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;outline:none;">
+                <span style="font-size:12px;color:var(--text2);">cm</span>
+              </div>
+            </div>
+            <div id="pantsNote" style="display:none;margin-top:7px;font-size:11px;color:var(--accent);font-family:'JetBrains Mono',monospace;font-weight:700;"></div>
+            <p style="font-size:11px;color:var(--text3);margin-top:5px;">褲腰尺寸通常比實際腰圍大 2–4cm（品牌與版型有差異），換算後為估算值。</p>
+          </div>
+        </div>
+        <div class="igroup"><label class="ilbl">BMI <span class="opt-badge">自動計算</span></label><div class="irow"><input type="number" id="bmi" placeholder="22.5" step="0.1" min="14" max="45"><span class="iunit">kg/m²</span></div><p class="ihint">填身高體重會自動帶入</p></div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-title">⚖️ 體態組成</div>
+      <div class="sect-toggle" onclick="toggleSect('bodyCompSect','bodyCompArrow')" style="cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;padding:12px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:12px;margin-bottom:11px;">
+        <span style="font-size:20px;">📊</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:800;color:var(--ink);">有體脂機？展開填寫，自動校正誤差</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px;">沒有體脂機可略過，其他數據仍可評估 → 點此展開</div>
+        </div>
+        <span id="bodyCompArrow" style="font-size:16px;color:var(--text3);transition:transform .3s;">▸</span>
+      </div>
+      <div id="bodyCompSect" style="display:none;">
+      <div class="igroup" style="margin-bottom:11px;">
+        <label class="ilbl">體脂機型號（誤差校正用）</label>
+        <div class="irow"><select id="deviceModel" onchange="updateDevNote()">
+          <option value="">未使用體脂機 / 不知道型號</option>
+          <optgroup label="Omron 歐姆龍">
+            <option value="omron_hbf">Omron HBF 系列（站立式）</option>
+            <option value="omron_karada">Omron KARADA Scan（手持+腳踩）</option>
+          </optgroup>
+          <optgroup label="Tanita 百利達">
+            <option value="tanita_bc">Tanita BC 系列（8電極）</option>
+            <option value="tanita_rd">Tanita RD-900 / RD-953（醫療級）</option>
+            <option value="tanita_basic">Tanita 基本款（4電極）</option>
+          </optgroup>
+          <optgroup label="InBody">
+            <option value="inbody_770">InBody 770（醫院/健身房）</option>
+            <option value="inbody_380">InBody 380 / 270（商業版）</option>
+            <option value="inbody_dial">InBody DIAL H20N（家用）</option>
+          </optgroup>
+          <optgroup label="Xiaomi 小米">
+            <option value="xiaomi_s400">小米體脂秤 S400</option>
+            <option value="xiaomi_basic">小米體脂秤（基本款）</option>
+          </optgroup>
+          <optgroup label="其他品牌">
+            <option value="garmin_bodyscale">Garmin Index S2</option>
+            <option value="withings">Withings Body+</option>
+            <option value="fitbit_aria">Fitbit Aria</option>
+            <option value="general">其他家用體脂機</option>
+          </optgroup>
+        </select></div>
+        <div class="dev-note" id="devNote" style="display:none;"></div>
+      </div>
+      <div class="ig">
+        <div class="igroup"><label class="ilbl">體脂率</label><div class="irow"><input type="number" id="bodyFat" placeholder="18" step="0.1" min="3" max="55" inputmode="decimal"><span class="iunit">%</span></div></div>
+        <div class="igroup"><label class="ilbl">肌肉率（骨骼肌率）</label><div class="irow"><input type="number" id="muscleRate" placeholder="75" step="0.1" min="40" max="95" inputmode="decimal"><span class="iunit">%</span></div></div>
+        <div class="igroup"><label class="ilbl">肌肉量（骨骼肌量）</label><div class="irow"><input type="number" id="muscleMass" placeholder="52" step="0.1" min="15" max="90" inputmode="decimal"><span class="iunit">kg</span></div></div>
+        <div class="igroup"><label class="ilbl">內臟脂肪</label><div class="irow"><input type="number" id="visceralFat" placeholder="3" step="0.5" min="1" max="25" inputmode="decimal"><span class="iunit">級</span></div><p class="ihint">正常1–9／偏高10–14／危險≥15</p></div>
+        <div class="igroup"><label class="ilbl">基礎代謝</label><div class="irow"><input type="number" id="bmr" placeholder="1580" min="900" max="3500" inputmode="numeric"><span class="iunit">kcal</span></div></div>
+      </div>
+      </div><!-- /bodyCompSect -->
+    </div>
+
+    <div class="sect">
+      <div class="sect-title">🏃 自我體能評估 <span class="opt-badge">快速選擇</span></div>
+      <p class="sect-note">不需儀器，選最符合描述的選項，用於估算心肺與肌力狀態。</p>
+      <div style="margin-bottom:13px;">
+        <div class="ex-clbl" style="margin-bottom:7px;">爬樓梯 4 層樓的感覺</div>
+        <div class="func-row" id="stairsRow">
+          <div class="func-card" onclick="selFunc(this,'stairs','easy')"><span class="func-icon">😊</span><div class="func-lbl">不太喘</div><div class="func-desc">輕鬆完成</div></div>
+          <div class="func-card" onclick="selFunc(this,'stairs','mod')"><span class="func-icon">😤</span><div class="func-lbl">有點喘</div><div class="func-desc">到頂休息一下</div></div>
+          <div class="func-card" onclick="selFunc(this,'stairs','hard')"><span class="func-icon">😮‍💨</span><div class="func-lbl">很喘</div><div class="func-desc">腳也有點痠</div></div>
+        </div>
+      </div>
+      <div>
+        <div class="ex-clbl" style="margin-bottom:7px;">徒手深蹲 20 下（無支撐）</div>
+        <div class="func-row" id="squatRow">
+          <div class="func-card" onclick="selFunc(this,'squat','easy')"><span class="func-icon">💪</span><div class="func-lbl">輕鬆完成</div><div class="func-desc">動作流暢</div></div>
+          <div class="func-card" onclick="selFunc(this,'squat','mod')"><span class="func-icon">😅</span><div class="func-lbl">勉強完成</div><div class="func-desc">後段吃力</div></div>
+          <div class="func-card" onclick="selFunc(this,'squat','hard')"><span class="func-icon">😣</span><div class="func-lbl">做不到20下</div><div class="func-desc">或動作不標準</div></div>
+          <div class="func-card" onclick="selFunc(this,'squat','skip')"><span class="func-icon">⏭️</span><div class="func-lbl">跳過</div><div class="func-desc">不方便測試</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="nav-btns">
+      <button class="btn-p" onclick="goStep(2)">下一步：心血管 &amp; 睡眠 →</button>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step-page" id="step2">
+    <div class="sect">
+      <div class="sect-title">💓 心血管指標</div>
+      <p class="sect-note">選填穿戴裝置後，HRV 與睡眠評分會依裝置可信度自動調整權重。只填血壓也很有參考價值。</p>
+      <div class="sect-toggle" onclick="toggleSect('wearSect','wearArrow')" style="cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;padding:12px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:12px;margin-bottom:11px;">
+        <span style="font-size:18px;">⌚</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:800;color:var(--ink);">有穿戴裝置？選型號讓 HRV 與睡眠評分更準確</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px;">Apple Watch / Garmin / Polar / Xiaomi 等 → 點此展開</div>
+        </div>
+        <span id="wearArrow" style="font-size:16px;color:var(--text3);transition:transform .3s;">▸</span>
+      </div>
+      <div id="wearSect" style="display:none;">
+      <div class="igroup" style="margin-bottom:11px;">
+        <label class="ilbl">穿戴裝置型號</label>
+        <div class="irow"><select id="wearableModel" onchange="updateWearNote()">
+          <option value="">未使用穿戴裝置</option>
+          <optgroup label="Apple Watch">
+            <option value="apple_s9">Apple Watch Series 9 / Ultra 2</option>
+            <option value="apple_s7s8">Apple Watch Series 7 / 8</option>
+            <option value="apple_se">Apple Watch SE</option>
+          </optgroup>
+          <optgroup label="Garmin">
+            <option value="garmin_fenix">Garmin Fenix 7 / Epix</option>
+            <option value="garmin_forerunner">Garmin Forerunner 955 / 265</option>
+            <option value="garmin_venu">Garmin Venu / Vivosmart</option>
+          </optgroup>
+          <optgroup label="Polar">
+            <option value="polar_h10">Polar H10（胸帶，HRV最準）</option>
+            <option value="polar_vantage">Polar Vantage V3 / Grit X2</option>
+            <option value="polar_pacer">Polar Pacer Pro</option>
+          </optgroup>
+          <optgroup label="WHOOP / Fitbit / Samsung">
+            <option value="whoop4">WHOOP 4.0</option>
+            <option value="fitbit_charge6">Fitbit Charge 6</option>
+            <option value="fitbit_sense2">Fitbit Sense 2</option>
+            <option value="samsung_galaxy">Samsung Galaxy Watch 6 / 7</option>
+          </optgroup>
+          <optgroup label="Xiaomi 小米">
+            <option value="xiaomi_band8">Xiaomi Smart Band 8 Pro</option>
+            <option value="xiaomi_watch">Xiaomi Watch S3 / S2</option>
+          </optgroup>
+          <optgroup label="其他">
+            <option value="wearable_general">其他穿戴裝置</option>
+          </optgroup>
+        </select></div>
+        <div class="dev-note" id="wearNote" style="display:none;"></div>
+      </div>
+      </div><!-- /wearSect -->
+      <div class="ig">
+        <div class="igroup"><label class="ilbl">靜止心率</label><div class="irow"><input type="number" id="restingHR" placeholder="60" min="30" max="120" inputmode="numeric"><span class="iunit">bpm</span></div><p class="ihint">早晨未起床前最準確</p></div>
+        <div class="igroup"><label class="ilbl">HRV <span class="opt-badge">穿戴裝置</span></label><div class="irow"><input type="number" id="hrv" placeholder="70" min="10" max="200" inputmode="numeric"><span class="iunit">ms</span></div><p class="ihint">建議填 7 天平均值</p></div>
+        <div class="igroup"><label class="ilbl">血氧濃度 <span class="opt-badge">選填</span></label><div class="irow"><input type="number" id="spo2" placeholder="97" step="0.1" min="88" max="100" inputmode="decimal"><span class="iunit">%</span></div></div>
+        <div class="igroup"><label class="ilbl">收縮壓（高壓）</label><div class="irow"><input type="number" id="systolic" placeholder="118" min="70" max="220" inputmode="numeric"><span class="iunit">mmHg</span></div></div>
+        <div class="igroup"><label class="ilbl">舒張壓（低壓）</label><div class="irow"><input type="number" id="diastolic" placeholder="76" min="45" max="130" inputmode="numeric"><span class="iunit">mmHg</span></div></div>
+        <div class="igroup"><label class="ilbl">空腹血糖</label><div class="irow"><input type="number" id="glucose" placeholder="90" min="60" max="300" inputmode="numeric"><span class="iunit">mg/dL</span></div><p class="ihint">空腹 8 小時後測量</p></div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-title">🌙 睡眠品質 &amp; 作息規律</div>
+      <p class="sect-note">只填總睡眠時長也可以。就寢／起床時間與規律性對身體年齡的影響不亞於睡眠時長，建議一起填。<br>💡 查詢方式：iPhone 健康App → 睡眠 / Garmin Connect → 睡眠 / Fitbit → 睡眠分析</p>
+      <div class="ig">
+        <div class="igroup"><label class="ilbl">總睡眠時長</label><div class="irow"><input type="number" id="sleepH" placeholder="7" min="2" max="12" style="max-width:50px;"><span class="iunit">時</span><input type="number" id="sleepM" placeholder="0" min="0" max="59" style="max-width:50px;"><span class="iunit">分</span></div></div>
+        <div class="igroup"><label class="ilbl">通常幾點就寢 <span class="opt-badge">選填</span></label><div class="irow"><select id="bedtime"><option value="">未填</option><option value="2130">21:30 以前</option><option value="2200">22:00</option><option value="2230">22:30</option><option value="2300">23:00</option><option value="2330">23:30</option><option value="0000">00:00</option><option value="0030">00:30</option><option value="0100">01:00</option><option value="0130">01:30</option><option value="0200">02:00</option><option value="late">02:00 以後</option></select></div><p class="ihint">習慣性就寢時間</p></div>
+        <div class="igroup"><label class="ilbl">通常幾點起床 <span class="opt-badge">選填</span></label><div class="irow"><select id="waketime"><option value="">未填</option><option value="0500">05:00 以前</option><option value="0530">05:30</option><option value="0600">06:00</option><option value="0630">06:30</option><option value="0700">07:00</option><option value="0730">07:30</option><option value="0800">08:00</option><option value="0830">08:30</option><option value="0900">09:00</option><option value="0930">09:30</option><option value="1000">10:00 以後</option></select></div><p class="ihint">習慣性起床時間</p></div>
+        <div class="igroup"><label class="ilbl">作息規律性 <span class="opt-badge">選填</span></label><div class="irow"><select id="sleepRegularity"><option value="">未填</option><option value="very">非常規律（每天差不多）</option><option value="mostly">大致規律（±1小時內）</option><option value="irregular">不太規律（±2小時以上）</option><option value="chaos">很亂（週末晚睡晚起）</option></select></div></div>
+        <div class="igroup"><label class="ilbl">睡前習慣 <span class="opt-badge">選填</span></label><div class="irow"><select id="sleepHabit"><option value="">未填</option><option value="good">有固定放鬆流程（不看手機）</option><option value="ok">偶爾滑手機後入睡</option><option value="bad">睡前長時間用手機/電腦</option><option value="work">睡前還在工作或思考</option></select></div></div>
+      </div><!-- /basic sleep grid -->
+      <div class="sect-toggle" onclick="toggleSect('sleepDevSect','sleepDevArrow')" style="cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;padding:11px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:12px;margin-top:10px;">
+        <span style="font-size:16px;">📊</span>
+        <div style="flex:1;"><div style="font-size:14px;font-weight:700;color:var(--ink);">有穿戴裝置睡眠數據？展開填寫</div><div style="font-size:12px;color:var(--text3);margin-top:1px;">深睡、快速動眼期（REM）、夜間清醒時間</div></div>
+        <span id="sleepDevArrow" style="font-size:16px;color:var(--text3);transition:transform .3s;">▸</span>
+      </div>
+      <div id="sleepDevSect" style="display:none;margin-top:10px;">
+        <div class="ig">
+          <div class="igroup"><label class="ilbl">深睡時間</label><div class="irow"><input type="number" id="deepSleepH" placeholder="0" min="0" max="4" style="max-width:50px;"><span class="iunit">時</span><input type="number" id="deepSleepM" placeholder="45" min="0" max="59" style="max-width:50px;"><span class="iunit">分</span></div><p class="ihint">深度非快速動眼睡眠（NREM 3期）</p></div>
+          <div class="igroup"><label class="ilbl">快速動眼期（REM）</label><div class="irow"><input type="number" id="remH" placeholder="1" min="0" max="5" style="max-width:50px;"><span class="iunit">時</span><input type="number" id="remM" placeholder="30" min="0" max="59" style="max-width:50px;"><span class="iunit">分</span></div><p class="ihint">做夢期，與記憶鞏固有關</p></div>
+          <div class="igroup"><label class="ilbl">夜間清醒時間</label><div class="irow"><input type="number" id="awakeH" placeholder="0" min="0" max="4" style="max-width:50px;"><span class="iunit">時</span><input type="number" id="awakeM" placeholder="15" min="0" max="59" style="max-width:50px;"><span class="iunit">分</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="nav-btns">
+      <button class="btn-s" onclick="goStep(1)">← 上一步</button>
+      <button class="btn-p" onclick="goStep(3)">下一步：運動 &amp; 生活 →</button>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step-page" id="step3">
+    <div class="sect">
+      <div class="sect-title">🏋️ 運動習慣</div>
+      <p class="sect-note">可新增多種運動，反映一週不同天的訓練組合。步行可填步數，不確定可估算。<br>評估會依所有項目整體判斷，並考量運動強度。</p>
+      <div id="exerciseList"></div>
+      <div class="sect-toggle" onclick="addEx()" style="cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;padding:12px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:12px;margin-top:8px;transition:all .2s;" onmouseover="this.style.background='rgba(45,106,79,0.08)';this.style.borderColor='var(--accent)'" onmouseout="this.style.background='var(--surface2)';this.style.borderColor='var(--border)'">
+        <span style="font-size:20px;">➕</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:800;color:var(--accent);">新增運動項目</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px;">每週不同天的運動可以分開新增，例如重訓3天 + 冥想7天</div>
+        </div>
+        <span style="font-size:16px;color:var(--accent);">＋</span>
+      </div>
+      <div class="ex-sum" id="exSum"></div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-title">💧 飲水 &amp; 飲食</div>
+      <div class="ig">
+        <div class="igroup"><label class="ilbl">每日飲水量（純水）</label><div class="irow"><input type="number" id="water" placeholder="2000" min="300" max="7000" inputmode="numeric"><span class="iunit">cc</span></div><p class="ihint">500cc瓶裝水×幾瓶可估算</p></div>
+        <div class="igroup" style="grid-column:span 2;">
+          <label class="ilbl">每週手搖飲 / 含糖飲料</label>
+          <div class="irow" style="gap:14px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;font-weight:600;color:var(--ink);"><input type="radio" name="btChoice" value="no" onchange="toggleBubbleTea(false)" style="accent-color:var(--accent);width:16px;height:16px;"> 不喝</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;font-weight:600;color:var(--ink);"><input type="radio" name="btChoice" value="yes" onchange="toggleBubbleTea(true)" style="accent-color:var(--accent);width:16px;height:16px;"> 有喝，展開填細節</label>
+          </div>
+          <div id="bubbleTeaDetail" style="display:none;margin-top:10px;padding:12px 14px;background:var(--surface2);border-radius:10px;border-left:3px solid var(--accent3);">
+            <div class="ig" style="gap:9px;">
+              <div class="igroup"><label class="ilbl">每週幾杯</label><div class="irow"><input type="number" id="bubbleTea" placeholder="3" min="1" max="21" step="1" inputmode="numeric"><span class="iunit">杯</span></div></div>
+              <div class="igroup"><label class="ilbl">習慣甜度</label><div class="irow"><select id="bubbleSugar"><option value="">未填</option><option value="nosug">無糖</option><option value="quarter">少糖以下</option><option value="half">半糖</option><option value="full">全糖 / 不減糖</option></select></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="igroup"><label class="ilbl">每週蔬菜攝取</label><div class="irow"><select id="vegFreq"><option value="">未填</option><option value="daily">每天都吃</option><option value="mostdays">大部分天（4–6天）</option><option value="sometimes">有時（1–3天）</option><option value="rare">很少吃蔬菜</option></select></div></div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="sect-title">🚬 抽菸 &amp; 飲酒 &amp; 壓力</div>
+      <div class="ig">
+        <div class="igroup" style="grid-column:span 2;">
+          <label class="ilbl">抽菸狀況</label>
+          <div class="irow"><select id="smoking" onchange="updSmoke()"><option value="">未填</option><option value="no">不抽菸</option><option value="yes">目前有抽</option><option value="quit">已戒菸</option></select></div>
+          <div class="smoke-det" id="smokeDet">
+            <div class="ex-clbl" style="margin-bottom:7px;">每天抽菸量（二選一填）</div>
+            <div style="display:flex;gap:11px;flex-wrap:wrap;align-items:center;">
+              <div style="display:flex;align-items:center;gap:6px;"><label style="font-size:12px;color:var(--text2);">包數</label><input type="number" id="smokePacks" placeholder="0.5" step="0.5" min="0.5" max="5" oninput="syncCigs()" style="width:62px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 8px;color:var(--ink);font-size:14px;font-weight:700;outline:none;font-family:'JetBrains Mono',monospace;"></div>
+              <span style="color:var(--text3);font-size:12px;">或</span>
+              <div style="display:flex;align-items:center;gap:6px;"><label style="font-size:12px;color:var(--text2);">根數</label><input type="number" id="smokeCigs" placeholder="10" step="1" min="1" max="100" oninput="syncPacks()" style="width:62px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 8px;color:var(--ink);font-size:14px;font-weight:700;outline:none;font-family:'JetBrains Mono',monospace;"></div>
+              <span style="font-size:11px;color:var(--text3);">1包=20根</span>
+            </div>
+          </div>
+          <div class="quit-det" id="quitDet">
+            <div class="ex-clbl" style="margin-bottom:6px;">戒菸多久了？</div>
+            <select id="quitDuration" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--ink);font-size:13px;font-weight:700;outline:none;width:100%;font-family:'Sora','Noto Sans TC',sans-serif;"><option value="">未填</option><option value="under6m">未滿6個月</option><option value="6to12m">6個月~1年</option><option value="1to3y">1~3年</option><option value="over3y">3年以上</option></select>
+          </div>
+        </div>
+        <div class="igroup"><label class="ilbl">飲酒頻率</label><div class="irow"><select id="alcohol"><option value="">未填</option><option value="rare">少或沒有</option><option value="weekly">每週1–3次</option><option value="often">每週4次以上</option></select></div></div>
+        <div class="igroup"><label class="ilbl">壓力感</label><div class="irow"><select id="stress"><option value="">未填</option><option value="low">偏低</option><option value="medium">中等</option><option value="high">偏高</option></select></div></div>
+      </div>
+    </div>
+
+    <div class="nav-btns">
+      <button class="btn-s" onclick="goStep(2)">← 上一步</button>
+      <button class="btn-p" onclick="calculate()">✦ 計算我的身體年齡</button>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="result-panel" id="resultPanel">
+    <div class="res-hero">
+      <div class="res-lbl">綜合身體年齡估算</div>
+      <div class="res-age" id="resAge">—</div>
+      <div class="res-range" id="resRange">歲</div>
+      <div class="res-diff" id="resDiff">—</div>
+      <div class="res-meta">
+        <div class="res-m"><div class="v" id="resTotalScore">—</div><div class="l">健康評分 /100</div></div>
+        <div class="res-m"><div class="v" id="resMetrics">—</div><div class="l">評估指標</div></div>
+        <div class="res-m"><div class="v" id="resBodyType">—</div><div class="l">身材類型</div></div>
+      </div>
+    </div>
+    <div class="share-row">
+      <button class="shr-btn pri" onclick="copyRes()">📋 複製結果摘要</button>
+      <button class="shr-btn" onclick="window.print()">🖨️ 列印 / 儲存PDF</button>
+      <button class="shr-btn" onclick="reset()">↩ 重新填寫</button>
+    </div>
+    <div style="margin-top:18px;">
+      <div class="sc-ttl">總體健康評分</div>
+      <div class="sc-meter">
+        <div id="scLbl" style="font-size:13px;color:var(--text2);"></div>
+        <div class="sc-row"><div class="sc-big" id="scBig">0</div><div class="sc-track"><div class="sc-fill" id="scFill"></div></div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text3);">/100</div></div>
+      </div>
+    </div>
+    <div class="body-type-card" id="bodyTypeCard" style="display:none;">
+      <div class="bt-lbl">身材類型分析</div>
+      <div class="bt-type" id="btType">—</div>
+      <div class="bt-desc" id="btDesc"></div>
+    </div>
+
+    <!-- ANIMAL BODY TYPE -->
+    <div id="animalCard" style="display:none;background:linear-gradient(135deg,#f0faf4,#e8f5e9);border:1.5px solid #c8e6c9;border-radius:18px;padding:22px;margin-bottom:18px;box-shadow:0 2px 12px rgba(45,106,79,0.08);">
+      <div style="font-size:11px;font-weight:800;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">🐾 動物體型對照</div>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <div id="animalEmoji" style="font-size:72px;line-height:1;flex-shrink:0;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.15));"></div>
+        <div style="flex:1;min-width:0;">
+          <div id="animalName" style="font-size:24px;font-weight:800;color:var(--ink);margin-bottom:6px;"></div>
+          <div id="animalTagline" style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px;"></div>
+          <div id="animalDesc" style="font-size:14px;color:var(--text2);line-height:1.65;"></div>
+        </div>
+      </div>
+      <div id="animalStats" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;"></div>
+      <div id="animalTip" style="margin-top:12px;padding:10px 14px;background:rgba(255,255,255,0.7);border-radius:10px;font-size:13px;color:var(--text2);line-height:1.6;"></div>
+    </div>
+    <div class="rank-card">
+      <div class="rank-main">
+        <div class="rank-lbl">Taiwan Peer Rank（模擬推估）</div>
+        <div class="rank-pct" id="rankPct">—<span>%</span></div>
+        <div class="rank-sub" id="rankSub">台灣同齡同性別</div>
+      </div>
+      <div class="rank-copy">
+        <div id="rankTxt"></div>
+        <div class="rank-note" id="rankNote"></div>
+      </div>
+    </div>
+    <div id="resSummary" style="background:var(--surface);border:1.5px solid var(--border);border-radius:13px;padding:16px 18px;margin-bottom:16px;font-size:14px;color:var(--text2);line-height:1.7;"></div>
+    <div class="pri-grid">
+      <div class="pri-card"><h3>🔴 優先改善</h3><ul id="priList"></ul></div>
+      <div class="pri-card"><h3>✅ 目前優勢</h3><ul id="strList"></ul></div>
+      <div class="pri-card"><h3>📅 30天行動</h3><ul id="actList"></ul></div>
+    </div>
+    <div class="sc-ttl">各項指標評估</div>
+    <div class="sc-grid" id="scGrid"></div>
+    <div class="bar-sec">
+      <div class="bar-sec-ttl">各指標對應身體年齡</div>
+      <div id="barChart"></div>
+    </div>
+    <div class="adv-sec">
+      <div class="bar-sec-ttl" style="margin-bottom:13px;">個人化建議</div>
+      <div id="advList"></div>
+      <div class="ref-note">參考方向：成人每週建議至少150分鐘中等強度活動並搭配2天肌力訓練；睡眠通常建議至少7小時；體脂機與穿戴裝置適合追蹤同裝置同條件趨勢，不適合跨裝置比較；血壓、血糖與BMI異常時請以醫療專業判讀為準。空腹血糖請填空腹8小時後數值。靜止心率低於40bpm若非長期運動者，建議諮詢醫師排除緩脈。</div>
+    </div>
+  </div>
+</div>
+<script>
+// ── UTILS ──
+const gv=(id,fb=null)=>{const el=document.getElementById(id);if(!el)return fb;const v=parseFloat(el.value);return isNaN(v)?fb:v;};
+const gs=(id)=>{const el=document.getElementById(id);return el?el.value.trim():'';};
+const hi=(id)=>{const el=document.getElementById(id);return!!el&&el.value.trim()!=='';};
+const cl=(v,mn,mx)=>Math.max(mn,Math.min(mx,v));
+const fmtD=(h,m)=>h>0&&m>0?`${h}時${m}分`:h>0?`${h}小時`:`${m}分鐘`;
+function dispList(id,items,fb){const ul=document.getElementById(id);ul.innerHTML='';(items.length?items:[fb]).slice(0,4).forEach(t=>{const li=document.createElement('li');li.textContent=t;ul.appendChild(li);});}
+function autoBmi(){const h=gv('height'),w=gv('weight');if(h&&w)document.getElementById('bmi').value=(w/(h/100)**2).toFixed(1);}
+
+// ── WIZARD ──
+function goStep(n){
+  // Step 1 → Step 2 validation
+  if(n===2){
+    const age=gv('age'),height=gv('height'),weight=gv('weight');
+    if(!age){alert('請填寫您的年齡');document.getElementById('age').focus();return;}
+    if(age<15||age>90){alert('年齡請填 15–90 歲的範圍');document.getElementById('age').focus();return;}
+    if(!height){alert('請填寫身高（用於計算BMI）');document.getElementById('height').focus();return;}
+    if(!weight){alert('請填寫體重（用於計算BMI）');document.getElementById('weight').focus();return;}
+  }
+  document.querySelectorAll('.step-page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(`step${n}`).classList.add('active');
+  [1,2,3].forEach(i=>{
+    const tab=document.getElementById(`tab${i}`),sn=document.getElementById(`sn${i}`);
+    tab.classList.remove('active','done');
+    if(i===n){tab.classList.add('active');sn.textContent=i;}
+    else if(i<n){tab.classList.add('done');sn.textContent='✓';}
+    else sn.textContent=i;
+  });
+  document.getElementById('progBar').style.width=`${(n/3)*100}%`;
+  window.scrollTo({top:document.querySelector('.wizard').offsetTop-16,behavior:'smooth'});
+}
+function selFunc(el,grp,val){document.querySelectorAll(`#${grp}Row .func-card`).forEach(c=>c.classList.remove('sel'));el.classList.add('sel');el.dataset.sel=val;}
+
+function toggleSect(sectId, arrowId){
+  const sect=document.getElementById(sectId);
+  const arrow=document.getElementById(arrowId);
+  const open = sect.style.display==='none' || sect.style.display==='';
+  sect.style.display = open ? 'block' : 'none';
+  if(arrow) arrow.style.transform = open ? 'rotate(90deg)' : 'rotate(0deg)';
+}
+
+function toggleBubbleTea(show){
+  document.getElementById('bubbleTeaDetail').style.display = show ? 'block' : 'none';
+  if(!show){
+    const inp = document.getElementById('bubbleTea');
+    if(inp) inp.value = '';
+    document.getElementById('bubbleSugar').value = '';
+  }
+}
+
+// ── DEVICE TABLES ──
+const devNotes={omron_hbf:'站立式BIA，受水分與足底接觸影響。已降低體組成權重，建議固定晨起排尿後量測看7天平均。',omron_karada:'手持+腳踩BIA，比單純腳踩穩定，但仍不適跨裝置比較。',tanita_bc:'多電極BIA，趨勢追蹤價值較高。已保留較高權重，建議固定量測條件。',tanita_rd:'多頻BIA，趨勢穩定性佳。保留較高權重，不等同DEXA或醫療診斷。',tanita_basic:'基本款BIA，單次值誤差較大。已降低權重，建議以腰圍、體重趨勢輔助。',inbody_770:'多頻分段BIA，固定條件下穩定性佳。保留較高權重，仍建議看趨勢。',inbody_380:'商用分段BIA，適合追蹤同裝置變化。',inbody_dial:'家用分段BIA，受水分與姿勢影響。已中度降權，建議看7天平均。',xiaomi_s400:'家用BIA，適合趨勢追蹤，單次值保守解讀。已降低體組成權重。',xiaomi_basic:'家用基本款BIA，單次值不建議作精準判斷。已明顯降低體組成權重。',garmin_bodyscale:'家用BIA，適合同裝置趨勢追蹤，固定時間量測。',withings:'家用BIA，趨勢追蹤價值高於單次判斷，建議用7天平均。',fitbit_aria:'家用BIA，單次值保守解讀。已降低體組成權重。',general:'不同品牌演算法差異大，已降低權重，建議固定時間空腹排尿後量測看趨勢。'};
+const wearNotes={apple_s9:'HRV、心率與睡眠分期適合看同裝置趨勢，睡眠階段非腦波量測，優先參考總睡眠時長。',apple_s7s8:'HRV與睡眠分期已中度降權，建議看週平均，不用單日數字判斷。',apple_se:'睡眠分期與血氧資料較有限，建議主要參考總睡眠時長、靜止心率與長期趨勢。',garmin_fenix:'HRV趨勢參考價值較高，建議以7天平均或裝置內HRV Status為主。',garmin_forerunner:'HRV趨勢參考價值較高，睡眠分期仍建議作輔助不作單次判斷。',garmin_venu:'適合看心率與睡眠總時長趨勢，HRV與分期資料已降低權重。',polar_h10:'靜止狀態HRV可信度較高，建議固定姿勢與時間量測。',polar_vantage:'HRV與睡眠趨勢可參考，建議用週平均而非單日值。',polar_pacer:'HRV與睡眠分期作輔助參考，總睡眠時長與恢復感更重要。',whoop4:'適合看長期恢復趨勢，單一HRV或睡眠分期不建議直接作健康判斷。',fitbit_charge6:'總睡眠時間通常比睡眠分期更值得參考，深睡與REM已降低權重。',fitbit_sense2:'可追蹤睡眠與壓力趨勢，分期資料建議看長期平均。',samsung_galaxy:'心率與睡眠趨勢可參考，血壓功能需定期官方方式校正。',xiaomi_band8:'適合看步數、心率與總睡眠時長趨勢，HRV與睡眠分期已明顯降權。',xiaomi_watch:'適合趨勢追蹤，HRV與睡眠分期請保守解讀。',wearable_general:'PPG量測與睡眠演算法差異大，已降低HRV與睡眠分期權重，建議同裝置長期追蹤。'};
+const devCorr={omron_hbf:{off:0.5,conf:0.72,err:'±3~5%'},omron_karada:{off:0,conf:0.82,err:'±2~4%'},tanita_bc:{off:0,conf:0.86,err:'±2~4%'},tanita_rd:{off:0,conf:0.90,err:'±2~3%'},tanita_basic:{off:0.5,conf:0.68,err:'±4~6%'},inbody_770:{off:0,conf:0.90,err:'±2~4%'},inbody_380:{off:0,conf:0.86,err:'±2~4%'},inbody_dial:{off:0.5,conf:0.78,err:'±3~5%'},xiaomi_s400:{off:1.0,conf:0.62,err:'±4~7%'},xiaomi_basic:{off:1.0,conf:0.55,err:'±5~8%'},garmin_bodyscale:{off:0.5,conf:0.72,err:'±3~6%'},withings:{off:0.5,conf:0.72,err:'±3~6%'},fitbit_aria:{off:0.5,conf:0.62,err:'±4~7%'},general:{off:0.5,conf:0.60,err:'±4~8%'}};
+const hrvConf={polar_h10:1.0,garmin_fenix:0.92,garmin_forerunner:0.88,apple_s9:0.82,whoop4:0.85,polar_vantage:0.88,polar_pacer:0.78,fitbit_sense2:0.75,fitbit_charge6:0.72,samsung_galaxy:0.75,apple_s7s8:0.78,apple_se:0.65,garmin_venu:0.72,xiaomi_watch:0.68,xiaomi_band8:0.55,wearable_general:0.65};
+const slpConf={polar_h10:0.85,garmin_fenix:0.80,garmin_forerunner:0.78,whoop4:0.80,apple_s9:0.75,apple_s7s8:0.70,polar_vantage:0.78,polar_pacer:0.65,fitbit_sense2:0.70,fitbit_charge6:0.65,samsung_galaxy:0.68,apple_se:0.55,garmin_venu:0.62,xiaomi_watch:0.60,xiaomi_band8:0.45,wearable_general:0.60};
+
+function updateDevNote(){const k=gs('deviceModel'),n=document.getElementById('devNote');if(k&&devNotes[k]){n.style.display='block';n.textContent='⚡ '+devNotes[k];}else n.style.display='none';}
+function updateWearNote(){const k=gs('wearableModel'),n=document.getElementById('wearNote');if(k&&wearNotes[k]){n.style.display='block';n.textContent='📡 '+wearNotes[k];}else n.style.display='none';}
+
+// ── SMOKING UI ──
+function updSmoke(){const v=gs('smoking');document.getElementById('smokeDet').style.display=v==='yes'?'block':'none';document.getElementById('quitDet').style.display=v==='quit'?'block':'none';}
+function syncCigs(){const p=parseFloat(document.getElementById('smokePacks').value);if(!isNaN(p))document.getElementById('smokeCigs').value=Math.round(p*20);}
+function syncPacks(){const c=parseFloat(document.getElementById('smokeCigs').value);if(!isNaN(c))document.getElementById('smokePacks').value=(c/20).toFixed(1);}
+
+// ── EXERCISE ──
+let exCnt=0;
+const exTypeOpts=`<option value="">選擇運動類型</option><optgroup label="高效益"><option value="mixed">重訓＋有氧混合</option><option value="strength">重訓／阻力訓練</option><option value="hiit">HIIT 間歇訓練</option></optgroup><optgroup label="有氧"><option value="cardio">有氧（跑步、騎車、游泳）</option><option value="sport">球類／競技運動</option><option value="walk">步行／健走</option></optgroup><optgroup label="柔軟恢復"><option value="yoga">瑜珈／伸展／冥想</option></optgroup><optgroup label="無"><option value="none">幾乎不運動</option></optgroup>`;
+function addEx(){
+  exCnt++;const id=exCnt;
+  const div=document.createElement('div');div.className='ex-block';div.id=`exB${id}`;
+  div.innerHTML=`<div class="ex-hdr"><span class="ex-title">運動項目 ${id}</span><button class="rm-btn" onclick="rmEx(${id})">移除</button></div><div class="ex-row"><div><div class="ex-clbl">運動類型</div><select class="ex-type" onchange="onExType(this,${id})">${exTypeOpts}</select></div><div><div class="ex-clbl">每週天數</div><input class="ex-days" type="number" placeholder="3" min="1" max="7" oninput="updExSum()"></div><div><div class="ex-clbl">每次分鐘</div><input class="ex-mins" type="number" placeholder="60" min="5" max="300" oninput="updExSum()"></div><div><div class="ex-clbl">強度</div><select class="ex-int" oninput="updExSum()"><option value="mod">中等</option><option value="easy">輕鬆</option><option value="hard">費力</option></select></div></div><div class="walk-row" id="wr${id}"><div class="ex-clbl" style="margin-bottom:6px;">每日步數（可估算）</div><div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;"><input class="ex-steps" type="number" placeholder="8000" min="500" max="40000" step="500" oninput="updExSum()" style="width:105px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 9px;color:var(--ink);font-family:\'JetBrains Mono\',monospace;font-weight:700;font-size:13px;outline:none;"><span style="font-size:11px;color:var(--text3);">散步≈6000 / 健走≈8000 / 快走≈10000</span></div></div>`;
+  document.getElementById('exerciseList').appendChild(div);updExSum();
+}
+function onExType(sel,id){document.getElementById(`wr${id}`).style.display=sel.value==='walk'?'block':'none';updExSum();}
+function rmEx(id){const el=document.getElementById(`exB${id}`);if(el)el.remove();updExSum();}
+function getExEntries(){
+  const es=[];
+  const stackable=['yoga','walk']; // can overlap with main exercises on same day
+  document.querySelectorAll('.ex-block').forEach(el=>{
+    const t=el.querySelector('.ex-type')?.value;
+    const d=parseFloat(el.querySelector('.ex-days')?.value)||0;
+    const m=parseFloat(el.querySelector('.ex-mins')?.value)||0;
+    const i=el.querySelector('.ex-int')?.value||'easy';
+    const s=parseFloat(el.querySelector('.ex-steps')?.value)||0;
+    if(t&&t!=='none'&&d>0) es.push({type:t,days:d,mins:m,int:i,steps:s,stackable:stackable.includes(t)});
+  });
+  return es;
+}
+function updExSum(){
+  const es=getExEntries();
+  // Separate low-overlap types: yoga/meditation/walk can stack with other exercises on same day
+  const nonStack=['yoga','walk']; // these are additive, don't count toward "day" overlap
+  const mainEs=es.filter(e=>!nonStack.includes(e.type));
+  const stackEs=es.filter(e=>nonStack.includes(e.type));
+  const mainDays=mainEs.reduce((s,e)=>s+e.days,0);
+  const totalDays=es.reduce((s,e)=>s+e.days,0);
+  const m=es.reduce((s,e)=>s+e.days*e.mins,0);
+  const st=es.filter(e=>e.type==='walk').reduce((s,e)=>s+e.steps,0);
+  const sum=document.getElementById('exSum');
+  if(totalDays>0){
+    sum.style.display='block';
+    let t=`本週合計：主訓練 ${mainDays} 天 · 總 ${totalDays} 天 · ${m} 分鐘`;
+    if(st>0) t+=` · 步行${st.toLocaleString()}步`;
+    if(stackEs.length>0){
+      const stackNames=stackEs.map(e=>({yoga:'冥想/伸展',walk:'步行'})[e.type]||e.type);
+      t+=`　✓ ${[...new Set(stackNames)].join('、')}可與主訓練同天疊加，不重複計算天數`;
+    }
+    if(mainDays>7) t+=' ⚠️ 主訓練天數超過7天，請確認';
+    if(m>2100) t+=' ⚠️ 週總分鐘數超過2100分鐘，計算將自動截斷';
+    sum.textContent=t;
+  } else sum.style.display='none';
+}
+
+// ── PEER RANK ──
+function peerRank({age,gender,totalScore,bioAge,bmi,waist,sys,dia,glucose,slpH,totalExMins,smoking}){
+  const band=age<30?'19–29歲':age<40?'30–39歲':age<50?'40–49歲':age<60?'50–59歲':age<70?'60–69歲':'70歲以上';
+  let p=50+(totalScore-72)*1.15+(age-bioAge)*2.2;
+  if(bmi!==null){if(bmi>=27)p-=10;else if(bmi>=24)p-=5;else if(bmi>=18.5&&bmi<24)p+=5;else p-=3;}
+  if(waist!==null){const wl=gender==='male'?90:80;if(waist>=wl+10)p-=10;else if(waist>=wl)p-=6;else if(waist<wl-8)p+=5;}
+  if(sys!==null&&dia!==null){if(sys>=140||dia>=90)p-=10;else if(sys>=130||dia>=80)p-=5;else if(sys<120&&dia<80)p+=4;}
+  if(glucose!==null){if(glucose>=126)p-=12;else if(glucose>=100)p-=6;else p+=3;}
+  if(slpH!==null){if(slpH>=7&&slpH<=9)p+=4;else if(slpH<6)p-=7;else p-=2;}
+  if(totalExMins>=300)p+=8;else if(totalExMins>=150)p+=5;else if(totalExMins>0&&totalExMins<75)p-=4;
+  if(smoking==='yes')p-=12;if(smoking==='no')p+=3;
+  p=Math.round(cl(p,3,97));
+  const tier=p>=85?'前段班':p>=70?'中上':p>=45?'接近平均':p>=25?'偏後段':'需優先改善';
+  return{p,band,tier,gender};
+}
+</script>
+<script>
+// ── CALCULATE ──
+function calculate(){
+  autoBmi();
+  const age=gv('age');
+  if(!age){alert('請至少輸入您的年齡');return;}
+  const gender=gs('gender'),height=gv('height',170),weight=gv('weight');
+  const dk=gs('deviceModel'),wk=gs('wearableModel');
+  const bfRaw=gv('bodyFat');
+  const corr=devCorr[dk]||{off:0,conf:dk?0.70:0.85,err:'±3~6%'};
+  const bf=bfRaw!==null?Math.max(3,bfRaw+corr.off):null;
+  const bfCorrected=bfRaw!==null&&corr.off!==0;
+  const bcc=corr.conf,hc=hrvConf[wk]||1.0,sc=slpConf[wk]||1.0;
+  const mm=gv('muscleMass'),mr=gv('muscleRate'),vf=gv('visceralFat'),bmr=gv('bmr'),bmi=gv('bmi'),waist=gv('waist');
+  const rhr=gv('restingHR'),hrv=gv('hrv'),spo2=gv('spo2'),sys=gv('systolic'),dia=gv('diastolic'),glucose=gv('glucose');
+  const dsH=gv('deepSleepH',0),dsM=gv('deepSleepM',0),deepSleep=(!hi('deepSleepH')&&!hi('deepSleepM'))?null:dsH*60+dsM;
+  const rH=gv('remH',0),rM=gv('remM',0),rem=(!hi('remH')&&!hi('remM'))?null:rH*60+rM;
+  const slH=gv('sleepH',0),slM=gv('sleepM',0),slpDur=(!hi('sleepH')&&!hi('sleepM'))?null:slH+slM/60;
+  const awH=gv('awakeH',0),awM=gv('awakeM',0),awake=(!hi('awakeH')&&!hi('awakeM'))?null:awH*60+awM;
+  const exEs=getExEntries();
+  // stackable items (yoga, walk) don't inflate the main exercise day count
+  const mainExEs=exEs.filter(e=>!e.stackable);
+  const stackExEs=exEs.filter(e=>e.stackable);
+  const exDays=mainExEs.reduce((s,e)=>s+e.days,0); // only main training days for scoring
+  const exMinsRaw=exEs.reduce((s,e)=>s+e.days*e.mins,0);
+  const exMins=Math.min(exMinsRaw,2100);
+  const walkEs=exEs.filter(e=>e.type==='walk');
+  const dailySteps=walkEs.length>0?walkEs.reduce((s,e)=>s+e.steps,0)/walkEs.length:0;
+  const bedtime=gs('bedtime'),waketime=gs('waketime'),sleepReg=gs('sleepRegularity'),sleepHabit=gs('sleepHabit');
+  const water=gv('water'),bt=gv('bubbleTea'),btSug=gs('bubbleSugar'),veg=gs('vegFreq');
+  const smoking=gs('smoking'),sp=gv('smokePacks'),sc2=gv('smokeCigs'),qd=gs('quitDuration');
+  const alcohol=gs('alcohol'),stress=gs('stress');
+  const stairsEl=document.querySelector('#stairsRow .func-card.sel'),squatEl=document.querySelector('#squatRow .func-card.sel');
+  const stairsV=stairsEl?.dataset?.sel||null,squatV=squatEl?.dataset?.sel||null;
+
+  let scores=[],cards=[],bars=[],advs=[],pris=[],strs=[],acts=[];
+  const LM={excellent:{sc:100,delta:-7},good:{sc:82,delta:-3},fair:{sc:62,delta:4},poor:{sc:35,delta:10}};
+  const BG={excellent:'✓ 優秀',good:'✓ 良好',fair:'⚠ 可改善',poor:'✗ 需優先處理'};
+  const BC={excellent:'#2d6a4f',good:'#2f80ed',fair:'#d97706',poor:'#e63946'};
+  const baStr=(lvl)=>`≈${cl(age+LM[lvl].delta,16,92)}歲`;
+
+  function addM({label,value,unit='',level,weight=1,adv,pri,str,act,raw,cn,noAge=false}){
+    const s=LM[level].sc,ba=baStr(level),dv=`${value}${unit}`;
+    scores.push({score:s,weight,label,level});
+    cards.push({label,value:dv,level,bioAge:ba,raw,cn,unit,noAge,badge:BG[level]});
+    bars.push({label,value:dv,bioAge:ba,level,pct:s,raw,unit,noAge});
+    if(adv)advs.push({dot:level==='poor'?'bad':level==='fair'?'warn':'good',text:adv});
+    if(level==='poor'||level==='fair')pris.push(pri||`${label} 目前為${level==='poor'?'需處理':'可改善'}區間`);
+    if(level==='excellent'||level==='good')strs.push(str||`${label} 表現良好`);
+    if(act&&(level==='poor'||level==='fair'))acts.push(act);
+  }
+  function sRange(label,value,ranges,unit,weight,advFn,act,raw,cn){
+    if(value===null)return;
+    const m=ranges.find(r=>value>=r.min&&value<=r.max)||ranges[ranges.length-1];
+    addM({label,value,unit,level:m.level,weight,adv:advFn?advFn(m.level):'',pri:m.priority,str:m.strength,act,raw,cn});
+  }
+
+  // BODY FAT
+  if(bf!==null){
+    const ranges=gender==='male'
+      ?[{min:8,max:14.9,level:'excellent',strength:`體脂精實且可持續`},{min:15,max:19.9,level:'good'},{min:20,max:24.9,level:'fair',priority:'體脂偏高'},{min:-Infinity,max:7.9,level:'fair',priority:'體脂偏低，留意荷爾蒙'},{min:25,max:Infinity,level:'poor',priority:'體脂明顯偏高'}]
+      :[{min:18,max:24.9,level:'excellent',strength:`體脂處於理想範圍`},{min:25,max:29.9,level:'good'},{min:30,max:34.9,level:'fair',priority:'體脂偏高'},{min:-Infinity,max:17.9,level:'fair',priority:'體脂偏低'},{min:35,max:Infinity,level:'poor',priority:'體脂明顯偏高'}];
+    const ct=corr.off>0?`+${corr.off}`:String(corr.off);
+    const rawCN=bfCorrected?`原始輸入：${bfRaw}% → 校正後：${bf}%（依${dk||'裝置'}特性校正${ct}%，常見誤差${corr.err}）`:(dk?`原始輸入：${bfRaw}%（此裝置未做固定偏移校正，常見誤差${corr.err}）`:null);
+    const note=bfCorrected?`（校正${ct}%，原始${bfRaw}%；${corr.err}）`:dk?`（${corr.err}）`:'';
+    sRange('體脂率',bf,ranges,'%',Math.round(2*bcc*10)/10,
+      l=>l==='excellent'?`體脂率 ${bf}% 表現很好${note}，維持規律活動與均衡飲食即可`:`體脂率 ${bf}% 可優化${note}，建議從減少含糖飲料、增加蔬菜蛋白質與規律有氧開始`,
+      '設定每天多走2,000步＋晚餐少一份精緻澱粉',bfCorrected?bfRaw:null,rawCN);
+  }
+
+  // MUSCLE RATE
+  if(mr!==null){
+    const thr=gender==='male'?[82,76,70,65]:[75,70,65,60];
+    let ml=mr>=thr[0]?'excellent':mr>=thr[1]?'good':mr>=thr[2]?'fair':'poor';
+    const cn=dk?`權重依裝置可信度調整（常見誤差${corr.err}）；骨骼肌率易受水分影響，建議固定條件追蹤趨勢`:null;
+    addM({label:'肌肉率（骨骼肌率）',value:mr,unit:'%',level:ml,weight:Math.round(2*bcc*10)/10,
+      adv:ml==='excellent'||ml==='good'?`肌肉率（骨骼肌率） ${mr}% 表現不錯，對體力與代謝有幫助`:`肌肉率（骨骼肌率） ${mr}% 可提升，建議增加阻力訓練與蛋白質攝取`,cn});
+  }
+
+  // MUSCLE MASS
+  if(mm!==null){
+    const tgt=gender==='male'?(weight?weight*0.42:28):(weight?weight*0.32:20);
+    const ratio=mm/tgt,ml=ratio>=1.12?'excellent':ratio>=1?'good':ratio>=0.9?'fair':'poor';
+    const cn=dk?`權重依裝置可信度調整（常見誤差${corr.err}）；骨骼肌量受演算法與水分影響，建議以趨勢判斷`:null;
+    addM({label:'肌肉量（骨骼肌量）',value:mm,unit:'kg',level:ml,weight:Math.round(1.2*bcc*10)/10,
+      adv:ml==='poor'||ml==='fair'?`肌肉量（骨骼肌量） ${mm}kg 可提升，每週2次阻力訓練+足夠蛋白質是關鍵`:`肌肉量（骨骼肌量） ${mm}kg 表現良好`,
+      act:'每週2次全身阻力訓練，每餐補充豆魚蛋肉或乳製品',cn});
+  }
+
+  // VISCERAL FAT
+  if(vf!==null){
+    const cn=dk?`權重依裝置可信度調整（常見誤差${corr.err}）；建議同裝置固定條件追蹤趨勢`:null;
+    sRange('內臟脂肪',vf,[
+      {min:1,max:4.9,level:'excellent',strength:`內臟脂肪 ${vf} 級，非常健康`},
+      {min:5,max:9.9,level:'good',strength:`內臟脂肪 ${vf} 級，正常範圍`},
+      {min:10,max:14.9,level:'fair',priority:`內臟脂肪 ${vf} 級偏高`},
+      {min:15,max:Infinity,level:'poor',priority:`內臟脂肪 ${vf} 級高風險`}
+    ],'級',Math.round(2*bcc*10)/10,
+    l=>{
+      if(l==='excellent')return `內臟脂肪 ${vf} 級，非常健康的低水平（正常1–9級），代謝疾病風險極低，維持目前習慣即可。`;
+      if(l==='good')return `內臟脂肪 ${vf} 級，位於正常健康範圍（1–9級），繼續維持規律活動。`;
+      if(l==='fair')return `內臟脂肪 ${vf} 級偏高（10–14為偏高），與腹部脂肪和代謝風險相關，建議從飲食與步行量一起改善。`;
+      return `內臟脂肪 ${vf} 級高風險（15以上），建議優先諮詢醫師或營養師。`;
+    },'維持規律有氧與均衡飲食，每週記錄趨勢',null,cn);
+  }
+
+  // BMI with muscle correction
+  if(bmi!==null){
+    const mmR=(mm&&weight)?mm/weight:null;
+    const highM=(mmR!==null&&mmR>(gender==='male'?0.44:0.34))||(mr!==null&&mr>(gender==='male'?82:75));
+    const modM=(mmR!==null&&mmR>(gender==='male'?0.40:0.30))||(mr!==null&&mr>(gender==='male'?76:70));
+    const hasMD=mm!==null||mr!==null;
+    let ml,cn=null,adv='';
+    if(bmi<18.5){ml='fair';adv=`BMI ${bmi} 偏低，建議確認是否肌肉量不足。`;}
+    else if(bmi<=23.9){ml='excellent';adv=`BMI ${bmi} 在理想範圍。`;}
+    else if(bmi<=26.9){
+      if(highM){ml='good';cn=`BMI ${bmi} 略超標準值，但骨骼肌率/量偏高──肌肉密度大於脂肪，BMI因此虛高。校正後評級調整為「良好」，建議以腰圍與體脂率作主要指標。`;adv=`BMI ${bmi} 略高，但結合高肌肉量分析，部分來自肌肉重量，腰圍與體脂率是更準確依據。`;}
+      else if(modM){ml='fair';cn=`BMI ${bmi} 超出標準，骨骼肌率略高，可能有部分肌肉貢獻，建議以腰圍與體脂率輔助判讀。`;adv=`BMI ${bmi} 偏高，肌肉量尚可，建議搭配體脂率確認。`;}
+      else{ml='fair';adv=`BMI ${bmi} 略高，建議搭配體脂率與腰圍一起看。`;}
+    }else{
+      if(highM){ml='fair';cn=`BMI ${bmi} 達肥胖門檻，但骨骼肌率/量明顯偏高（肌肉型高BMI）。仍建議以體脂率與腰圍為主要風險判斷；若腰圍與體脂均正常，代謝風險遠低於一般BMI≥27族群。`;adv=`BMI ${bmi} 偏高，結合高肌肉量後代謝風險相對降低，請以體脂率和腰圍為主要指標。`;}
+      else{ml='poor';adv=`BMI ${bmi} 達肥胖範圍且未偵測到顯著高肌肉量，代謝風險上升。`;}
+    }
+    if(!hasMD)cn=`未填骨骼肌量或骨骼肌率，BMI無法做肌肉校正──高肌肉量者BMI可能虛高，建議補充體脂機數據後重新評估。`;
+    addM({label:'BMI',value:bmi,unit:'',level:ml,weight:hasMD?0.8:1,
+      adv:adv+'（BMI不分肌肉與脂肪，請以腰圍、體脂率為主要健康指標。）',
+      act:'每週固定量測體重與腰圍，觀察趨勢',cn});
+  }
+
+  // WAIST
+  if(waist!==null){
+    const wl=gender==='male'?90:80,ml=waist<wl-10?'excellent':waist<wl?'good':waist<wl+10?'fair':'poor';
+    addM({label:'腰圍',value:waist,unit:'cm',level:ml,weight:1.5,
+      adv:ml==='excellent'||ml==='good'?`腰圍 ${waist}cm 表現良好`:`腰圍 ${waist}cm 偏高，腹部脂肪比體重更能反映代謝風險`,
+      act:'飯後步行15分鐘＋晚餐含糖飲料先減半，連續追蹤4週腰圍變化'});
+  }
+
+  // RESTING HR
+  if(rhr!==null){
+    const note40=rhr<40?'（<40bpm若非長期運動者建議諮詢醫師確認）':'';
+    sRange('靜止心率',rhr,[
+      {min:0,max:39.9,level:'good',strength:`靜止心率 ${rhr}bpm，極低，請確認非病理性緩脈`},
+      {min:40,max:49.9,level:'excellent',strength:`靜止心率 ${rhr}bpm，運動員水平`},
+      {min:50,max:69.9,level:'excellent',strength:`靜止心率 ${rhr}bpm，理想範圍`},
+      {min:70,max:80,level:'good'},{min:80.1,max:89.9,level:'fair',priority:`靜止心率 ${rhr}bpm 偏高`},
+      {min:90,max:999,level:'poor',priority:`靜止心率 ${rhr}bpm 明顯偏高`}
+    ],'bpm',1.5,
+    l=>{
+      if(rhr<40)return `靜止心率 ${rhr}bpm 非常低${note40}`;
+      if(l==='excellent'&&rhr<50)return `靜止心率 ${rhr}bpm，運動員水平，心肺效率極佳。`;
+      if(l==='excellent')return `靜止心率 ${rhr}bpm，位於理想範圍（50–70bpm），心肺功能良好。`;
+      if(l==='good')return `靜止心率 ${rhr}bpm，正常健康範圍，規律有氧可望進一步下降。`;
+      if(l==='fair')return `靜止心率 ${rhr}bpm 略偏高，建議透過規律有氧、改善睡眠與壓力管理逐步改善。`;
+      return `靜止心率 ${rhr}bpm 明顯偏高（>90bpm），若長期如此建議就醫排除心血管問題。`;
+    },'每週3次以上中強度有氧，長期可有效降低靜止心率');
+  }
+
+  // HRV（age-adjusted）
+  if(hrv!==null){
+    const hw=Math.round(2*hc*10)/10,isLow=wk&&hc<0.80;
+    const cn=wk?isLow?`裝置可信度較低（${Math.round(hc*100)}%），評分權重已調降；建議看7天移動平均趨勢`:`裝置可信度尚可（${Math.round(hc*100)}%），仍建議以7天平均為準`:null;
+    const adj=Math.max(0,(age||35)-25)*0.9,ex=Math.round(85-adj),gd=Math.round(60-adj),fr=Math.round(38-adj);
+    let hl=hrv>=ex?'excellent':hrv>=gd?'good':hrv>=fr?'fair':'poor';
+    const ct=isLow?'（此裝置HRV演算法誤差較大，建議看7天趨勢，不宜單日判斷）':'';
+    addM({label:'HRV',value:hrv,unit:'ms',level:hl,weight:hw,
+      adv:(hl==='excellent'||hl==='good')
+        ?`HRV ${hrv}ms 對 ${age||35} 歲表現良好（年齡調整後優秀閾值≥${ex}ms）。HRV高代表自律神經調節靈活、恢復能力好；若突然遠高於基準，也可能是過度訓練前兆，建議持續追蹤7天平均趨勢。${ct}`
+        :`HRV ${hrv}ms（年齡調整後優秀閾值≥${ex}ms），有提升空間。先確認睡眠是否充足、壓力、酒精攝取與是否過度訓練。${ct}`,
+      act:'用穿戴裝置追蹤7天移動平均HRV，比單日數值更有參考價值',cn});
+  }
+
+  // SpO2
+  if(spo2!==null){
+    let sl=spo2>=97?'excellent':spo2>=95?'good':spo2>=93?'fair':'poor';
+    addM({label:'血氧濃度',value:spo2,unit:'%',level:sl,weight:1,
+      adv:sl==='poor'?`血氧 ${spo2}% 偏低，若多次量測仍偏低建議就醫確認`:`血氧 ${spo2}% 位於可接受範圍`});
+  }
+
+  // BLOOD PRESSURE
+  if(sys!==null&&dia!==null){
+    let bl=sys<120&&dia<80?'excellent':sys<130&&dia<80?'good':sys<140&&dia<90?'fair':'poor';
+    addM({label:'血壓',value:`${sys}/${dia}`,unit:'mmHg',level:bl,weight:2,
+      adv:bl==='excellent'||bl==='good'?`血壓 ${sys}/${dia}mmHg 表現良好`:`血壓 ${sys}/${dia}mmHg 偏高，建議減少鹽分、規律活動並安靜狀態重複量測`,
+      act:'連續7天早晚量血壓取平均；若多次≥140/90建議諮詢醫師'});
+  }
+
+  // GLUCOSE
+  if(glucose!==null){
+    let gl=glucose<=99?'excellent':glucose<=109?'good':glucose<=125?'fair':'poor';
+    addM({label:'空腹血糖',value:glucose,unit:'mg/dL',level:gl,weight:2,
+      adv:gl==='excellent'?`空腹血糖 ${glucose}mg/dL 在理想範圍（≤99）`:`空腹血糖 ${glucose}mg/dL 偏高，優先減少含糖飲料、甜點與精緻澱粉，飯後步行15分鐘`,
+      act:'空腹血糖偏高：每餐後15分鐘步行，晚餐後避免再進食'});
+  }
+
+  // SLEEP
+  if(deepSleep!==null){
+    const dn=fmtD(dsH,dsM),sw=Math.round(1.5*sc*10)/10,isLow=wk&&sc<0.75;
+    const cn=wk?isLow?`裝置睡眠分期可信度較低（${Math.round(sc*100)}%），評分權重已調降；建議看週平均`:`裝置可信度尚可（${Math.round(sc*100)}%），建議以長期趨勢為主`:null;
+    let dl=deepSleep>=70?'excellent':deepSleep>=55?'good':deepSleep>=40?'fair':'poor';
+    addM({label:'深睡時間',value:dn,unit:'',level:dl,weight:sw,
+      adv:dl==='excellent'||dl==='good'?`深睡 ${dn} 表現不錯${isLow?'（建議看週平均趨勢）':''}`:`深睡 ${dn} 偏低，建議固定起床時間、睡前降低光線與酒精攝取`,
+      act:'連續追蹤30天深睡趨勢',cn});
+  }
+  if(rem!==null){
+    const rd=fmtD(rH,rM),rw=Math.round(1*sc*10)/10,isLow=wk&&sc<0.75;
+    const cn=wk?isLow?`裝置睡眠分期可信度較低（${Math.round(sc*100)}%），評分權重已調降`:`裝置可信度尚可（${Math.round(sc*100)}%）`:null;
+    let rl=rem>=90?'excellent':rem>=70?'good':rem>=50?'fair':'poor';
+    addM({label:'REM時間',value:rd,unit:'',level:rl,weight:rw,
+      adv:rl==='excellent'||rl==='good'?`REM ${rd} 表現良好`:`REM ${rd} 可改善，先從睡眠總時長與規律作息下手`,
+      act:'REM連續追蹤30天，目標推進到良好區間',cn});
+  }
+  if(awake!==null){
+    const ad=fmtD(awH,awM),isLow=wk&&sc<0.75;
+    let al=awake<=20?'excellent':awake<=40?'good':awake<=70?'fair':'poor';
+    const cn=wk?isLow?`裝置睡眠偵測可信度較低（${Math.round(sc*100)}%），評分權重已調降`:`裝置可信度尚可（${Math.round(sc*100)}%）`:null;
+    addM({label:'夜間清醒',value:ad,unit:'',level:al,weight:Math.round(1*sc*10)/10,
+      adv:al==='excellent'||al==='good'?`夜間清醒 ${ad}，睡眠連續性不錯`:`夜間清醒 ${ad} 偏長，建議先檢查咖啡因、酒精、睡前用手機、壓力或夜尿問題`,
+      act:'睡前60分鐘停用手機，避免睡前飲酒',cn});
+  }
+  if(slpDur!==null){
+    const sd=fmtD(slH,slM);
+    sRange('睡眠時長',slpDur,[
+      {min:7,max:8.8,level:'excellent',strength:'睡眠時長接近理想區間'},
+      {min:6,max:6.9,level:'fair',priority:'睡眠時長不足'},
+      {min:8.9,max:9.5,level:'good'},
+      {min:-Infinity,max:5.9,level:'poor',priority:'睡眠時長明顯不足'},
+      {min:9.6,max:Infinity,level:'fair',priority:'睡眠時間偏長，若仍疲勞可檢查睡眠品質'}
+    ],'小時',1.5,
+    l=>l==='excellent'||l==='good'?`睡眠 ${sd} 接近成人建議範圍（7–9小時）`:`睡眠 ${sd} 可能影響精神、代謝與專注，建議逐步調整作息`,
+    '連續30天固定起床時間，睡前60分鐘降低螢幕亮度');
+  }
+
+  // SLEEP SCHEDULE & LIFESTYLE
+  const sleepSchedInputs = [bedtime, waketime, sleepReg, sleepHabit].filter(v => v !== '');
+  if (sleepSchedInputs.length > 0) {
+    // Bedtime scoring: before 23:00 = ideal, 23–00 = ok, 00–01 = fair, after 01 = poor
+    let bedScore = 80; // default neutral
+    const bedMap = {'2130':100,'2200':100,'2230':95,'2300':88,'2330':78,'0000':65,'0030':52,'0100':40,'0130':30,'0200':22,'late':15};
+    if (bedtime) bedScore = bedMap[bedtime] || 80;
+
+    // Wake time: 06:00–07:30 = ideal, earlier/later = minor deduction
+    let wakeScore = 80;
+    const wakeMap = {'0500':72,'0530':82,'0600':95,'0630':100,'0700':100,'0730':95,'0800':88,'0830':78,'0900':65,'0930':52,'1000':40};
+    if (waketime) wakeScore = wakeMap[waketime] || 80;
+
+    // Regularity
+    let regScore = 80;
+    const regMap = {'very':100,'mostly':82,'irregular':52,'chaos':30};
+    if (sleepReg) regScore = regMap[sleepReg] || 80;
+
+    // Pre-sleep habit
+    let habitScore = 80;
+    const habitMap = {'good':100,'ok':72,'bad':45,'work':35};
+    if (sleepHabit) habitScore = habitMap[sleepHabit] || 80;
+
+    // Weighted combined
+    const filledCount = [bedtime,waketime,sleepReg,sleepHabit].filter(v=>v!=='').length;
+    const weights = [bedtime?1.2:0, waketime?0.8:0, sleepReg?1.5:0, sleepHabit?1.0:0];
+    const wSum = weights.reduce((s,w)=>s+w,0);
+    const schedCombined = wSum > 0
+      ? Math.round((bedScore*(bedtime?1.2:0)+wakeScore*(waketime?0.8:0)+regScore*(sleepReg?1.5:0)+habitScore*(sleepHabit?1.0:0))/wSum)
+      : 80;
+    const sl2 = schedCombined>=88?'excellent':schedCombined>=72?'good':schedCombined>=52?'fair':'poor';
+
+    // Build advice string dynamically
+    const advParts = [];
+    if (bedtime && bedMap[bedtime] < 70) {
+      const bedHuman = {
+        '0000':'午夜12點','0030':'00:30','0100':'凌晨1點','0130':'01:30','0200':'凌晨2點','late':'凌晨2點以後'
+      }[bedtime] || bedtime;
+      advParts.push(`習慣性晚睡（${bedHuman}）──睡前2小時皮質醇下降是高品質睡眠的關鍵，晚睡會壓縮深睡窗口`);
+    }
+    if (sleepReg === 'irregular' || sleepReg === 'chaos') advParts.push('作息不規律，週末補眠不能彌補工作日睡眠不足，建議把起床時間固定在±30分鐘以內');
+    if (sleepHabit === 'bad' || sleepHabit === 'work') advParts.push('睡前用手機或思考工作會讓皮質醇維持高位、抑制褪黑激素分泌，建議睡前45分鐘切換到低刺激活動');
+
+    const goodParts = [];
+    if (bedtime && bedMap[bedtime] >= 88) goodParts.push('就寢時間早，有助於充分利用深睡窗口');
+    if (sleepReg === 'very' || sleepReg === 'mostly') goodParts.push('作息規律，有利於生理時鐘穩定與荷爾蒙分泌');
+    if (sleepHabit === 'good') goodParts.push('有良好的睡前放鬆習慣，有助縮短入睡時間');
+
+    const fullAdv = (advParts.length > 0 ? advParts.join('；') + '。' : '') +
+      (goodParts.length > 0 ? goodParts.join('、') + '。' : '');
+
+    addM({
+      label: '作息規律性',
+      value: {very:'非常規律',mostly:'大致規律',irregular:'不太規律',chaos:'很亂',good:'睡前好習慣',ok:'偶爾滑手機',bad:'睡前長時間用手機',work:'睡前還在工作'}[sleepReg||sleepHabit] || '已填入',
+      unit: '',
+      level: sl2,
+      weight: 1.2,
+      noAge: false,
+      adv: fullAdv || (sl2==='excellent'||sl2==='good' ? '作息與睡前習慣良好，有助睡眠品質與荷爾蒙節律。' : '作息或睡前習慣需要調整，建議從固定起床時間和減少睡前螢幕使用開始。'),
+      pri: sl2==='poor'||sl2==='fair' ? '作息不規律或睡前習慣不佳，是拖累睡眠品質的隱性因素' : undefined,
+      str: sl2==='excellent'||sl2==='good' ? '作息規律且有良好睡前習慣' : undefined,
+      act: '設定固定起床鬧鐘（即使週末），睡前45分鐘手機放到另一個房間'
+    });
+  }
+
+  // FUNCTIONAL FITNESS
+  if(stairsV){
+    const sl=stairsV==='easy'?'excellent':stairsV==='mod'?'fair':'poor';
+    addM({label:'心肺耐力',value:stairsV==='easy'?'不太喘':stairsV==='mod'?'有點喘':'很喘',unit:'',level:sl,weight:1.2,
+      adv:sl==='excellent'?'爬4層樓不喘，基礎心肺功能良好':sl==='fair'?'爬樓梯有點喘，建議每週增加1–2次有氧訓練':'爬樓梯明顯喘，建議從規律步行開始增加心肺負荷',
+      act:'每天爬3–5層樓梯，比搭電梯更有效鍛鍊心肺'});
+  }
+  if(squatV&&squatV!=='skip'){
+    const sql=squatV==='easy'?'excellent':squatV==='mod'?'fair':'poor';
+    addM({label:'下肢肌力',value:squatV==='easy'?'輕鬆完成':squatV==='mod'?'勉強完成':'做不到20下',unit:'',level:sql,weight:1.2,
+      adv:sql==='excellent'?'深蹲20下輕鬆完成，下肢肌力良好':sql==='fair'?'深蹲勉強完成，建議加入每週1–2次腿部阻力訓練':'深蹲做不到20下，建議從徒手分腿蹲或椅子輔助深蹲開始',
+      act:'每週2次深蹲訓練，從3組10下開始，每週加2–3下'});
+  }
+
+  // EXERCISE
+  if(exEs.length>0){
+    const tSc={strength:90,hiit:88,mixed:95,cardio:80,sport:78,yoga:65,walk:55,none:10};
+    const tLbl={strength:'重訓',hiit:'HIIT',mixed:'重訓+有氧',cardio:'有氧',sport:'球類',yoga:'瑜珈/冥想',walk:'步行',none:'不運動'};
+    const iMult={easy:0.75,mod:1.0,hard:1.2};
+    // Main exercises: weighted score by type × intensity × days
+    const mainWtSc=mainExEs.length>0
+      ? mainExEs.reduce((s,e)=>s+(tSc[e.type]||50)*(iMult[e.int]||1)*e.days,0)/Math.max(1,exDays)
+      : 50;
+    // Stackable bonus: yoga/walk add quality bonus but don't change day count
+    const stackBonus=stackExEs.reduce((s,e)=>{
+      const b=(e.type==='yoga'?8:4)*(iMult[e.int]||0.75); return s+Math.min(b,12);},0);
+    const wtSc=Math.min(100,mainWtSc+stackBonus);
+    const daysSc=exDays>=5?100:exDays>=4?90:exDays>=3?75:exDays>=2?55:exDays>=1?35:0;
+    const minsSc=exMins>=300?100:exMins>=200?85:exMins>=120?70:exMins>=60?50:30;
+    let sBonus=0,sNote='';
+    if(dailySteps>0){if(dailySteps>=10000){sBonus=8;sNote=`每日約${Math.round(dailySteps).toLocaleString()}步，達理想目標`;}else if(dailySteps>=7500){sBonus=5;sNote=`每日約${Math.round(dailySteps).toLocaleString()}步，步行量良好`;}else if(dailySteps>=5000){sBonus=2;sNote=`每日約${Math.round(dailySteps).toLocaleString()}步，建議提升到8000步以上`;}else{sNote=`每日約${Math.round(dailySteps).toLocaleString()}步，偏少`;}}
+    const combined=Math.min(100,Math.round(wtSc*0.5+daysSc*0.3+minsSc*0.2+sBonus));
+    const el=combined>=88?'excellent':combined>=72?'good':combined>=55?'fair':'poor';
+    const stepsD=dailySteps>0?` · 步行${Math.round(dailySteps).toLocaleString()}步`:'';
+    scores.push({score:combined,weight:2,label:'運動習慣',level:el});
+    cards.push({label:'運動習慣',value:`${Math.min(exDays,7)}天/週`,level:el,bioAge:baStr(el),noAge:false,badge:BG[el]});
+    bars.push({label:'運動習慣',value:`${Math.min(exDays,7)}天·${exMins}分${stepsD}`,bioAge:baStr(el),level:el,pct:combined});
+    const hasStr=exEs.some(e=>['strength','mixed','hiit'].includes(e.type));
+    const hasCar=exEs.some(e=>['cardio','mixed','hiit','sport','walk'].includes(e.type));
+    const hasWalk=exEs.some(e=>e.type==='walk'),hasHI=exEs.some(e=>['strength','hiit','mixed'].includes(e.type));
+    const hasYoga=exEs.some(e=>e.type==='yoga');
+    const isWalkOnly=exEs.every(e=>e.type==='walk'||e.type==='yoga');
+    const stackableNote=stackExEs.length>0?`（${stackExEs.map(e=>tLbl[e.type]).join('、')}可與主訓練同天疊加，已計入恢復加分）`:'';
+    const tNames=[...new Set(exEs.map(e=>tLbl[e.type]))].join('、');
+    let oTxt=`【整體運動評估】本週：${tNames}，主訓練${exDays}天 / 總${exMins}分鐘${stackableNote}`;
+    if(sNote)oTxt+=`；${sNote}。`;else oTxt+='。';
+    if(el==='excellent'||el==='good'){oTxt+='整體活動量達到建議標準，';if(hasStr&&hasCar)oTxt+='阻力訓練與有氧都有覆蓋，是最均衡的模式，維持現有節奏即可。';else if(hasStr)oTxt+='阻力訓練充足；若想提升心肺，可補充每週1次30分鐘有氧。';else oTxt+='有氧比例充足；建議每週加入1–2次阻力訓練，維持肌肉量與基礎代謝。';}
+    else if(el==='fair'){oTxt+='活動量尚可但有提升空間。';if(isWalkOnly)oTxt+='步行是很好的基礎；若以身體組成改善為目標，建議逐步加入每週1–2次輕度阻力訓練。';else if(!hasStr)oTxt+='目前缺乏阻力訓練，建議加入每週1–2次重訓或HIIT。';else oTxt+='建議把每週有效訓練時間提升至150分鐘以上，可分3–4次完成。';}
+    else oTxt+='整體活動量偏低，是影響身體年齡最明顯的因素。建議先從最容易維持的項目開始，例如每天固定步行20分鐘。';
+    advs.push({dot:el==='poor'?'bad':el==='fair'?'warn':'good',text:oTxt});
+    if(hasWalk&&!hasHI&&exDays>=3)advs.push({dot:'warn',text:'步行是很好的有氧基礎，但對肌肉量刺激有限。建議在步行外額外安排每週1–2次阻力訓練，兩者互補效果最好。'});
+    if(hasYoga&&exDays===0)advs.push({dot:'warn',text:'瑜珈/冥想有助壓力管理與柔軟度，但對心肺與肌肉量的刺激有限。若想全面改善身體組成，建議另外加入每週2次阻力訓練或有氧。'});
+    if(hasYoga&&hasStr)advs.push({dot:'good',text:'重訓搭配冥想/伸展是很好的組合：重訓刺激肌肉與代謝，冥想降低皮質醇、改善睡眠品質，兩者互補效果顯著。'});
+    if(exMins>0&&exMins<150)advs.push({dot:'warn',text:`本週運動總時間約${exMins}分鐘，低於建議的每週150分鐘中等強度活動。`});
+    if(el==='excellent'||el==='good')strs.push(`本週運動組合：${tNames}，${exDays}天 / ${exMins}分鐘${stepsD}`);
+    else pris.push(`每週運動總量偏低（${exDays}天 / ${exMins}分鐘），建議逐步增加`);
+  }
+
+  // WATER
+  if(water!==null){
+    let wTgt=weight?weight*35:2200;if(exMins>=150)wTgt+=400;if(age&&age>=60)wTgt+=200;wTgt=Math.min(wTgt,4000);
+    const ratio=water/wTgt;let wl=ratio>=0.9&&ratio<=1.5?'excellent':ratio>=0.75?'good':ratio>=0.58?'fair':'poor';
+    if(ratio>1.8)wl='fair';
+    const tgt=Math.round(wTgt/100)*100;
+    let wa='';
+    if(wl==='excellent')wa=`每日飲水量 ${water}cc，符合依體重與活動量估算的建議量（約${tgt}cc）。`;
+    else if(ratio>1.5)wa=`每日飲水量 ${water}cc，超過建議量（約${tgt}cc）。除非醫師建議，不需要刻意喝超多。`;
+    else wa=`每日飲水量 ${water}cc，低於建議量（約${tgt}cc）。水分不足可能影響精神、排便與運動表現。`;
+    addM({label:'飲水量',value:water,unit:'cc',level:wl,weight:0.8,noAge:true,adv:wa,act:`目標每天${tgt}cc，分4–5次補水`});
+  }
+
+  // BUBBLE TEA
+  if(bt!==null){
+    const sp2={nosug:0,quarter:0.3,half:0.6,full:1.0}[btSug]??0.8;
+    const sn={nosug:'無糖',quarter:'少糖',half:'半糖',full:'全糖'}[btSug]??'';
+    const sl=sn?`（${sn}）`:'';const eff=bt*sp2;
+    let bl='excellent',ba='';
+    if(eff<=0.5){bl='excellent';ba=`每週手搖飲 ${bt}杯${sl}，糖分攝取風險低，繼續保持。`;}
+    else if(eff<=1.5){bl='good';ba=`每週手搖飲 ${bt}杯${sl}，糖分尚可控制，可嘗試改點無糖或少糖。`;}
+    else if(eff<=3.5){bl='fair';ba=`每週手搖飲 ${bt}杯${sl}，含糖量偏高，建議至少降為半糖並搭配飯後步行。`;}
+    else{bl='poor';ba=`每週手搖飲 ${bt}杯${sl}，糖分攝取明顯偏高，影響體脂、血糖與代謝，建議先從降甜度開始。`;}
+    addM({label:'手搖飲',value:`${bt}杯/週${sl}`,unit:'',level:bl,weight:0.7,noAge:true,adv:ba,act:'先把全糖改半糖，再把每週次數減少1–2杯'});
+  }
+
+  // VEG
+  if(veg){const vm={daily:'excellent',mostdays:'good',sometimes:'fair',rare:'poor'}[veg],vt={daily:'每天都吃',mostdays:'大部分天',sometimes:'有時',rare:'很少'}[veg];
+    addM({label:'蔬菜攝取',value:vt,unit:'',level:vm,weight:0.8,noAge:true,
+      adv:vm==='excellent'||vm==='good'?'蔬菜攝取頻率良好，有助膳食纖維、抗氧化與腸道健康':'蔬菜攝取不足，建議每餐至少加入一拳頭份量的蔬菜',
+      act:'每餐先吃蔬菜再吃主食，有助血糖控制且更容易達標'});}
+
+  // SMOKING
+  if(smoking==='yes'){
+    const cigs=sc2!==null?sc2:(sp!==null?sp*20:null);
+    let sw=2,slbl='有抽菸',sadv='';
+    if(cigs!==null){slbl=`抽菸 ${Math.round(cigs)}根/天`;if(cigs>=20){sw=3;sadv=`每天 ${Math.round(cigs)}根（≥1包），重度吸菸，肺癌、心血管疾病與COPD風險顯著上升。戒菸是所有健康行動中效益最高的一項，建議諮詢戒菸門診。`;}else if(cigs>=10){sw=2.5;sadv=`每天 ${Math.round(cigs)}根（約半包），中度吸菸。心血管與肺部風險仍明顯高於不吸菸者，沒有「安全吸菸量」，建議設定戒菸日。`;}else{sw=2;sadv=`每天 ${Math.round(cigs)}根，輕度吸菸。即使少量，心血管與癌症風險仍顯著高於不吸菸者。`;}}else sadv='抽菸會提高心血管、肺部與多種癌症風險，戒菸是最值得優先處理的健康行動之一。';
+    addM({label:'抽菸',value:slbl,unit:'',level:'poor',weight:sw,noAge:true,adv:sadv,pri:cigs&&cigs>=20?'重度抽菸，心血管與肺部風險最高優先處理':'抽菸是高權重負面因子',act:'設定戒菸日；撥打台灣戒菸專線0800-636363或至戒菸門診'});
+  }else if(smoking==='quit'){
+    let ql='good',qn='已戒菸',qa='';
+    if(qd==='under6m'){qn='已戒菸（未滿6個月）';qa='戒菸不滿6個月，繼續維持，1年後心臟病發風險開始下降。';}
+    else if(qd==='6to12m'){qn='已戒菸（6個月~1年）';qa='戒菸6個月至1年，肺功能已有改善，繼續保持。';}
+    else if(qd==='1to3y'){qn='已戒菸（1~3年）';ql='excellent';qa='戒菸超過1年，心臟病風險明顯下降，非常值得驕傲的決定。';}
+    else if(qd==='over3y'){qn='已戒菸（3年以上）';ql='excellent';qa='戒菸超過3年，心肺功能恢復程度可接近不吸菸者。';}
+    else qa='已戒菸很好，繼續保持。';
+    addM({label:'抽菸',value:qn,unit:'',level:ql,weight:1,noAge:true,adv:qa,str:'已戒菸，效益最高的健康決定之一'});
+  }else if(smoking==='no'){
+    addM({label:'抽菸',value:'不抽菸',unit:'',level:'excellent',weight:0.5,noAge:true,str:'不抽菸，對心血管、皮膚老化與肺功能都是重大優勢'});
+  }
+
+  // ALCOHOL
+  if(alcohol==='weekly')addM({label:'飲酒',value:'每週1–3次',unit:'',level:'good',weight:0.8,noAge:true,adv:'飲酒可能影響睡眠品質與血壓，建議避免睡前飲酒'});
+  else if(alcohol==='often')addM({label:'飲酒',value:'每週4次以上',unit:'',level:'poor',weight:1.2,noAge:true,adv:'飲酒頻率偏高，明顯影響睡眠、血壓、肝臟與體脂',pri:'飲酒頻率偏高，建議先減少到每週0–2次',act:'把飲酒日集中並設定上限，睡眠差的前一晚不飲酒'});
+  else if(alcohol==='rare')addM({label:'飲酒',value:'少或沒有',unit:'',level:'excellent',weight:0.5,noAge:true,str:'飲酒少，有利睡眠與體脂控制'});
+
+  // STRESS
+  if(stress==='high')addM({label:'壓力',value:'偏高',unit:'',level:'poor',weight:1.2,noAge:true,adv:'壓力偏高可能影響睡眠、食慾、血壓與精神，建議列入優先改善',pri:'壓力偏高',act:'睡前30分鐘停止工作訊息，建立固定放鬆流程'});
+  else if(stress==='medium')addM({label:'壓力',value:'中等',unit:'',level:'fair',weight:0.8,noAge:true,pri:'壓力中等，若睡眠或血壓不佳可優先處理'});
+  else if(stress==='low')addM({label:'壓力',value:'偏低',unit:'',level:'excellent',weight:0.5,noAge:true,str:'壓力低，有利恢復與長期健康'});
+
+  // BMR
+  if(bmr!==null&&age&&weight){
+    const exp=gender==='male'?10*weight+6.25*height-5*age+5:10*weight+6.25*height-5*age-161;
+    const r=bmr/Math.max(1,exp),ml=r>=1.05?'excellent':r>=0.95?'good':r>=0.88?'fair':'poor';
+    addM({label:'基礎代謝',value:bmr,unit:'kcal',level:ml,weight:1,
+      adv:ml==='excellent'||ml==='good'?`基礎代謝 ${bmr}kcal 與身高體重相符`:`基礎代謝 ${bmr}kcal 偏低，可透過增加肌肉量、總活動量與睡眠改善`,
+      act:'每週增加2次全身阻力訓練，每日步數提高1,500–3,000步'});
+  }
+
+  if(scores.length===0){alert('請至少填寫幾項數據');return;}
+
+  // WEIGHTED SCORE
+  const tw=scores.reduce((s,x)=>s+x.weight,0),ws=scores.reduce((s,x)=>s+x.score*x.weight,0)/tw;
+  const totalScore=Math.round(ws),bioAge=cl(Math.round(age+(72-totalScore)/3.2),16,92);
+  const lowDataWarning=scores.length<=3?`⚠️ 目前只填了 ${scores.length} 個指標，評估結果容易因單一異常值而偏差，建議補填更多項目讓評估更準確。`:'';
+
+  // BODY TYPE
+  let bType='',bDesc='',bShort='—';
+  const mmR2=(mm&&weight)?mm/weight:null;
+  if(bf!==null&&mm!==null){
+    const isHi=mmR2>(gender==='male'?0.42:0.32);
+    if(bf<(gender==='male'?15:22)&&isHi){bType='💪 精實肌肉型';bShort='精實肌肉';bDesc='體脂偏低且肌肉量充足，是最健康的身材類型，代謝效率高，維持現有習慣即可。';}
+    else if(bf<(gender==='male'?12:18)){bType='⚡ 精瘦型';bShort='精瘦型';bDesc='體脂很低，需留意肌肉量是否充足及荷爾蒙與恢復能力是否受影響。';}
+    else if(bf>(gender==='male'?25:32)&&!isHi){bType='🔴 高脂低肌型';bShort='高脂低肌';bDesc='體脂偏高且肌肉量不足（泡芙型），代謝效率最低，建議優先增加阻力訓練並改善飲食結構。';}
+    else if(bf>(gender==='male'?25:32)){bType='📈 體脂偏高型';bShort='體脂偏高';bDesc='體脂偏高，先從飲食控制與有氧運動著手，搭配阻力訓練避免肌肉流失。';}
+    else if(!isHi){bType='🔶 低肌體型';bShort='低肌型';bDesc='肌肉量偏低，即使體重正常也建議增加阻力訓練，提升代謝基礎。';}
+    else{bType='✅ 均衡型';bShort='均衡型';bDesc='體脂與肌肉量均在正常範圍，維持現有習慣並持續追蹤趨勢即可。';}
+  }else if(bmi!==null){
+    if(bmi<18.5){bType='⚡ 體重偏輕';bShort='體重偏輕';bDesc='BMI偏低，建議確認是否為低肌肉量，適當增加蛋白質與阻力訓練。';}
+    else if(bmi<24){bType='✅ 體重正常';bShort='體重正常';bDesc='BMI在理想範圍，建議補充腰圍或體脂率更精確評估。';}
+    else if(bmi<27){bType='📈 體重略高';bShort='體重略高';bDesc='BMI偏高，搭配腰圍判斷腹部脂肪風險。';}
+    else{bType='🔴 體重過重';bShort='體重過重';bDesc='BMI達肥胖範圍，代謝風險上升，建議諮詢醫師或營養師。';}
+  }
+
+  // RENDER RESULTS
+  document.getElementById('resultPanel').style.display='block';
+  document.getElementById('resultPanel').classList.add('show');
+  document.querySelectorAll('.step-page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('resAge').textContent=bioAge;
+  document.getElementById('resRange').textContent=`${bioAge-1}–${bioAge+1} 歲（推算值）`;
+  const diff=age-bioAge;
+  const de=document.getElementById('resDiff');
+  de.className='res-diff'+(diff<0?' older':'');
+  de.textContent=diff>0?`比實際年齡年輕 ${diff} 歲`:diff<0?`比實際年齡老 ${Math.abs(diff)} 歲`:'與實際年齡相符';
+  document.getElementById('resTotalScore').textContent=totalScore;
+  document.getElementById('resMetrics').textContent=scores.length;
+  document.getElementById('resBodyType').textContent=bShort;
+  document.getElementById('scBig').textContent=totalScore;
+  setTimeout(()=>{document.getElementById('scFill').style.width=`${totalScore}%`;},100);
+  const slbl=['','需改善','普通','良好','優秀','卓越'];
+  document.getElementById('scLbl').textContent=`整體評級：${slbl[totalScore>=90?5:totalScore>=75?4:totalScore>=60?3:totalScore>=45?2:1]}`;
+  if(bType){document.getElementById('bodyTypeCard').style.display='block';document.getElementById('btType').textContent=bType;document.getElementById('btDesc').textContent=bDesc;}
+
+  // ── ANIMAL BODY TYPE ──
+  renderAnimal({bf,mm,mr,bmi,totalScore,gender,exEs,age,weight,height});
+  const rank=peerRank({age,gender,totalScore,bioAge,bmi,waist,sys,dia,glucose,slpH:slpDur,totalExMins:exMins,smoking});
+  document.getElementById('rankPct').innerHTML=`${rank.p}<span>%</span>`;
+  document.getElementById('rankSub').textContent=`${rank.band} · ${gender==='male'?'男性':'女性'} · ${rank.tier}`;
+  document.getElementById('rankTxt').innerHTML=`<strong>約優於 ${rank.p}% 的台灣${rank.band}${gender==='male'?'男性':'女性'}族群</strong>。換句話說，同齡同性別100人中，你大約落在第 ${rank.p} 百分位。`;
+  document.getElementById('rankNote').textContent='⚠️ 此為模擬推估值，非官方統計數據。依總分、BMI、腰圍、血壓、血糖、睡眠、活動量與抽菸狀態推算，參考台灣國民營養健康調查建立公式，不等同個人實際排名。';
+  document.getElementById('resSummary').textContent=`${lowDataWarning}這次共納入 ${scores.length} 個指標。分數適合拿來追蹤趨勢，不是疾病診斷。體脂機與穿戴裝置數據已依可信度調整權重。建議優先處理同時影響多個系統的項目，例如腰圍、血壓、血糖、睡眠與活動量。`;
+  scores.filter(s=>s.level==='poor'||s.level==='fair').sort((a,b)=>a.score-b.score).slice(0,3).forEach(s=>{if(!pris.some(p=>p.includes(s.label)))pris.push(`${s.label} 是目前拖累總分的項目`);});
+  dispList('priList',pris,'目前沒有明顯紅燈，維持現有習慣即可');
+  dispList('strList',strs,'已輸入優勢項目較少，可補充更多數據讓評估更完整');
+  dispList('actList',acts,'先選一個最容易執行的習慣，連續30天再加第二個');
+
+  const grid=document.getElementById('scGrid');grid.innerHTML='';
+  cards.forEach(c=>{
+    const d=document.createElement('div');d.className=`sc-card ${c.level}`;
+    let cnH=c.cn?`<div class="sc-corr">${c.cn}</div>`:'';
+    const ar=c.noAge?`<span class="sc-badge ${c.level}">${c.badge}</span>`:`<div class="sc-age">填寫值：${c.raw!=null?c.raw+c.unit:c.value}<br>對應身體年齡：${c.bioAge}</div>`;
+    d.innerHTML=`<div class="sc-metric">${c.label}</div><div class="sc-value">${c.value}</div>${ar}${cnH}`;
+    grid.appendChild(d);
+  });
+
+  const rmMap={excellent:'非常好',good:'良好',fair:'可改善',poor:'需處理'};
+  const bc=document.getElementById('barChart');bc.innerHTML='';
+  bars.forEach((b,i)=>{
+    const d=document.createElement('div');d.className='bar-row';
+    const dv=b.raw!=null?`${b.raw}${b.unit}→${b.value}`:`${b.value||'未填寫'}`;
+    const ar=b.noAge?`<div class="bar-age" style="color:${BC[b.level]}">${rmMap[b.level]}</div>`:`<div class="bar-age" style="color:${BC[b.level]}">${b.bioAge}</div>`;
+    d.innerHTML=`<div class="bar-lbl">${b.label}</div><div class="bar-track"><div class="bar-fill" id="bf${i}" style="background:${BC[b.level]}"></div></div><div class="bar-right">${ar}<div class="bar-meta">${dv}</div></div>`;
+    bc.appendChild(d);
+    setTimeout(()=>{document.getElementById(`bf${i}`).style.width=`${b.pct}%`;},150+i*65);
+  });
+
+  const al=document.getElementById('advList');al.innerHTML='';
+  if(!advs.length)advs.push({dot:'good',text:'各項數據均在良好範圍，繼續維持現有生活習慣和訓練計劃。'});
+  advs.forEach(a=>{const d=document.createElement('div');d.className='adv-item';d.innerHTML=`<div class="adv-dot ${a.dot}"></div><div>${a.text}</div>`;al.appendChild(d);});
+
+  window._resultText=`【身體年齡評估結果】\n${window._animalText||''}\n身體年齡：${bioAge}歲（實際${age}歲${diff>=0?' / 年輕'+diff+'歲':' / 較老'+Math.abs(diff)+'歲'}）\n健康評分：${totalScore}/100\n台灣同齡排名：前${100-rank.p}%\n身材類型：${bShort}\n\n優先改善：${pris.slice(0,3).join('、')||'無'}\n目前優勢：${strs.slice(0,3).join('、')||'無'}`;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── ANIMAL BODY TYPE ENGINE ──
+function renderAnimal({bf,mm,mr,bmi,totalScore,gender,exEs,age,weight,height}){
+  // Determine key body composition profile
+  const hasBodyComp = bf!==null || mm!==null || mr!==null;
+  const bmiVal = bmi || (weight&&height ? weight/(height/100)**2 : null);
+
+  // BodyFat thresholds by gender
+  const bfLow  = gender==='male' ? 12 : 18;
+  const bfMid  = gender==='male' ? 18 : 25;
+  const bfHigh = gender==='male' ? 25 : 32;
+  const bfVHigh= gender==='male' ? 30 : 38;
+
+  // Muscle mass ratio
+  const mmR = (mm&&weight) ? mm/weight : null;
+  const highMuscle = (mmR!==null && mmR>(gender==='male'?0.43:0.33)) ||
+                     (mr!==null  && mr>(gender==='male'?82:75));
+  const lowMuscle  = (mmR!==null && mmR<(gender==='male'?0.38:0.28)) ||
+                     (mr!==null  && mr<(gender==='male'?72:65));
+
+  const hasExercise = exEs && exEs.length>0;
+  const hasHighInt  = exEs && exEs.some(e=>['strength','hiit','mixed'].includes(e.type));
+
+  // Pick animal based on profile
+  let animal = null;
+
+  // === LEAN & MUSCULAR ===
+  if(bf!==null && bf<bfLow && highMuscle){
+    animal = {
+      emoji:'🐆', name:'獵豹', tagline:'精實、快速、爆發力十足',
+      desc:'你的體脂率低、肌肉量充足，就像獵豹一樣——精實的身型配上強健的肌肉，隨時能全力衝刺。這是大多數人夢寐以求的體型，代謝效率高，身體恢復能力強。',
+      tip:'🎯 維持建議：保持阻力訓練的一致性，注意蛋白質攝取，不要讓訓練量超過恢復能力。',
+      stats:[{icon:'⚡',label:'代謝效率',val:'極高'},{icon:'💪',label:'肌肉量',val:'充足'},{icon:'🔥',label:'體脂',val:'精實'}]
+    };
+  }
+  // === LEAN BUT LOW MUSCLE ===
+  else if(bf!==null && bf<bfLow && !highMuscle){
+    animal = {
+      emoji:'🦅', name:'雄鷹', tagline:'輕盈靈活，有待強化翅膀肌力',
+      desc:'你的體脂很低，就像老鷹一樣輕盈，但若肌肉量不夠充足，飛行的持久力就有限。輕盈是優點，但建議補充阻力訓練來強化整體力量，避免隨年齡增長肌肉量流失過快。',
+      tip:'🎯 重點：每週加入2次阻力訓練，搭配充足蛋白質（每公斤體重1.6g以上）。',
+      stats:[{icon:'🕊️',label:'體態',val:'輕盈'},{icon:'⚠️',label:'肌肉量',val:'可加強'},{icon:'🔥',label:'體脂',val:'偏低'}]
+    };
+  }
+  // === BALANCED & HEALTHY ===
+  else if(bf!==null && bf>=bfLow && bf<bfMid && !lowMuscle){
+    animal = {
+      emoji:'🦁', name:'獅子', tagline:'均衡強健，王者之姿',
+      desc:'你的體脂率和肌肉量都在理想範圍，就像獅子一樣——強壯但不過量，靈活卻不失力量。這是最理想的健康體型區間，代謝穩定，日常體力充沛。',
+      tip:'🎯 維持建議：保持規律的混合訓練（阻力＋有氧），注意睡眠品質，讓身體持續在最佳狀態。',
+      stats:[{icon:'⚖️',label:'體態',val:'均衡'},{icon:'💪',label:'肌力',val:'良好'},{icon:'❤️',label:'代謝',val:'穩定'}]
+    };
+  }
+  // === HIGH MUSCLE HIGH WEIGHT (powerlifter type) ===
+  else if(bmiVal!==null && bmiVal>=27 && highMuscle){
+    animal = {
+      emoji:'🐘', name:'大象', tagline:'力量型體格，壯碩而有力',
+      desc:'你的體重偏高，但肌肉量豐富，就像大象一樣——看起來壯碩，但力量驚人、耐力十足。這種體型在力量型運動中有天然優勢，代謝風險也比同等體重的低肌肉族群低很多。',
+      tip:'🎯 建議方向：維持阻力訓練的同時，補充有氧提升心肺功能，讓體重管理更有彈性。',
+      stats:[{icon:'🏋️',label:'力量',val:'強大'},{icon:'💪',label:'肌肉量',val:'豐富'},{icon:'📈',label:'體重',val:'偏高'}]
+    };
+  }
+  // === HIGH BODY FAT, LOWER MUSCLE (soft physique) ===
+  else if(bf!==null && bf>=bfHigh && lowMuscle){
+    animal = {
+      emoji:'🐼', name:'貓熊', tagline:'圓潤可愛，等待覺醒的潛力',
+      desc:'體脂率偏高加上肌肉量不足，就像貓熊一樣——軟萌但代謝偏低，容易囤積熱量。好消息是：貓熊是很受歡迎的動物，而且這個體型是最容易透過規律訓練改變的！改變起點越早，效果越顯著。',
+      tip:'🎯 起點建議：先從每天15分鐘步行建立習慣，再逐步加入每週2次輕度阻力訓練，飲食先從減少手搖飲開始。',
+      stats:[{icon:'⬆️',label:'體脂',val:'偏高'},{icon:'⚠️',label:'肌肉量',val:'偏低'},{icon:'🚀',label:'改善潛力',val:'很大'}]
+    };
+  }
+  // === HIGH BODY FAT, DECENT MUSCLE ===
+  else if(bf!==null && bf>=bfHigh){
+    animal = {
+      emoji:'🐻', name:'棕熊', tagline:'儲能體質，力量潛藏其中',
+      desc:'就像棕熊一樣，你的身體儲存了大量能量，肌肉量還不錯但被體脂覆蓋著。棕熊在需要時可以爆發驚人的力量——你也一樣，只需要系統性的訓練來讓肌肉更清晰呈現。',
+      tip:'🎯 重點：有氧搭配阻力訓練，飯後步行15分鐘有效改善血糖代謝，同時避免睡前兩小時進食。',
+      stats:[{icon:'⬆️',label:'體脂',val:'偏高'},{icon:'💪',label:'肌力',val:'潛力豐富'},{icon:'⚡',label:'方向',val:'調整中'}]
+    };
+  }
+  // === BMI ONLY paths (no body comp data) ===
+  else if(bmiVal!==null && bmiVal<18.5){
+    animal = {
+      emoji:'🦩', name:'紅鶴', tagline:'纖細優雅，注意補充養分',
+      desc:'就像紅鶴一樣身形纖細，體重偏輕可能意味著肌肉量或體脂率偏低。建議補充體脂機數據確認真實體組成，並適當增加蛋白質攝取與阻力訓練。',
+      tip:'🎯 建議：每天確保攝取足夠熱量與蛋白質，每週加入2次阻力訓練刺激肌肉生長。',
+      stats:[{icon:'🕊️',label:'體型',val:'纖細'},{icon:'⚠️',label:'體重',val:'偏輕'},{icon:'🥩',label:'需補充',val:'蛋白質'}]
+    };
+  }
+  else if(bmiVal!==null && bmiVal>=18.5 && bmiVal<24){
+    animal = {
+      emoji:'🦊', name:'狐狸', tagline:'靈動均衡，聰明維持健康',
+      desc:'BMI在理想範圍，就像狐狸一樣——聰明、靈活、體態均衡。建議補充體脂機或腰圍數據，讓評估更精確，確認這份均衡是真正的肌肉/體脂健康，還是「隱性肥胖」。',
+      tip:'🎯 下一步：補充體脂機數據或量腰圍，確認是否有「低肌肉量但BMI正常」的狀況。',
+      stats:[{icon:'✅',label:'BMI',val:'理想範圍'},{icon:'🦊',label:'靈活度',val:'良好'},{icon:'📊',label:'建議',val:'補充更多數據'}]
+    };
+  }
+  else if(bmiVal!==null && bmiVal>=24 && bmiVal<27){
+    animal = {
+      emoji:'🦭', name:'海豹', tagline:'圓潤活力，很有潛力的體型',
+      desc:'BMI略高，就像海豹一樣——看起來圓潤，但其實非常靈活，在水中（適合的環境）表現出色。若你有規律運動，這個BMI可能含有相當的肌肉量，建議以體脂率和腰圍來輔助判斷。',
+      tip:'🎯 確認方向：量量腰圍（男≤90cm / 女≤80cm），搭配體脂機確認體組成，別只靠BMI判斷。',
+      stats:[{icon:'📈',label:'BMI',val:'略高'},{icon:'💡',label:'提示',val:'需確認體組成'},{icon:'🏊',label:'活動力',val:'良好'}]
+    };
+  }
+  else if(bmiVal!==null && bmiVal>=27){
+    animal = {
+      emoji:'🦛', name:'犀牛', tagline:'厚實有力，改變從今天開始',
+      desc:'就像犀牛一樣體格厚實。BMI偏高，但犀牛的皮膚極其堅韌、生命力旺盛——重要的是內在健康指標（血壓、血糖、腰圍）。若這些數值正常，代謝風險比想像低；若偏高，建議優先從飲食和日常活動量著手。',
+      tip:'🎯 立即行動：每天飯後散步15分鐘、晚餐減少精緻澱粉，這兩件事執行3週後再評估。',
+      stats:[{icon:'📈',label:'BMI',val:'肥胖範圍'},{icon:'💪',label:'生命力',val:'旺盛'},{icon:'🔑',label:'關鍵',val:'改善飲食與活動'}]
+    };
+  }
+  // === HIGH FITNESS ===
+  else if(totalScore>=85 && !hasBodyComp){
+    animal = {
+      emoji:'🐬', name:'海豚', tagline:'全方位健康，聰明又靈活',
+      desc:'你的整體健康評分很高！就像海豚一樣——聰明、有活力、對環境適應能力強。各項指標均衡良好，繼續保持這個生活節奏，同時補充體組成數據讓評估更完整。',
+      tip:'🎯 精進方向：補充體脂機數據確認體組成，讓健康管理更精準。',
+      stats:[{icon:'⭐',label:'整體評分',val:'優秀'},{icon:'🔄',label:'適應力',val:'強'},{icon:'📊',label:'建議',val:'補充體組成數據'}]
+    };
+  }
+  // DEFAULT
+  else {
+    animal = {
+      emoji:'🦒', name:'長頸鹿', tagline:'正在探索最適合自己的高度',
+      desc:'就像長頸鹿一樣，你正在找到屬於自己的位置。填寫更多數據（特別是體脂率和肌肉量），可以讓我們給你更精準的動物對照和健康建議！',
+      tip:'💡 補充建議：前往步驟一填寫體態組成數據，即可解鎖更精準的動物體型對照。',
+      stats:[{icon:'📊',label:'數據',val:'需補充'},{icon:'🔍',label:'評估',val:'初步判斷'},{icon:'✨',label:'潛力',val:'待發掘'}]
+    };
+  }
+
+  if(!animal) return;
+
+  const card = document.getElementById('animalCard');
+  card.style.display = 'block';
+  document.getElementById('animalEmoji').textContent = animal.emoji;
+  document.getElementById('animalName').textContent = animal.name;
+  document.getElementById('animalTagline').textContent = animal.tagline;
+  document.getElementById('animalDesc').textContent = animal.desc;
+  document.getElementById('animalTip').textContent = animal.tip;
+
+  const statsEl = document.getElementById('animalStats');
+  statsEl.innerHTML = animal.stats.map(s=>
+    `<div style="background:rgba(255,255,255,0.7);border:1px solid rgba(45,106,79,0.15);border-radius:10px;padding:8px 12px;font-size:12px;text-align:center;min-width:80px;">
+      <div style="font-size:16px;">${s.icon}</div>
+      <div style="font-weight:800;color:var(--ink);margin:3px 0 1px;">${s.val}</div>
+      <div style="color:var(--text3);font-size:11px;">${s.label}</div>
+    </div>`
+  ).join('');
+
+  // Add to copy text
+  window._animalText = `動物體型：${animal.emoji} ${animal.name}（${animal.tagline}）`;
+}
+
+function copyRes(){
+  const t=window._resultText||'尚未計算結果';
+  navigator.clipboard.writeText(t).then(()=>alert('✅ 已複製到剪貼簿')).catch(()=>{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert('✅ 已複製到剪貼簿');});
+}
+
+function reset(){
+  document.getElementById('resultPanel').classList.remove('show');
+  document.getElementById('resultPanel').style.display='none';
+  goStep(1);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── PANTS SIZE CONVERTER ──
+// Pants size (inches) to actual waist (cm): pants_cm = inches * 2.54, then actual waist ≈ pants_cm - 3cm average gap
+// Different formula: brand trousers waist label = actual waist - 2~4cm, so actual waist ≈ label_cm + 3cm
+function convertPants(){
+  const inches = parseFloat(document.getElementById('pantsSize').value);
+  if(isNaN(inches)) return;
+  // 1 inch = 2.54cm, then add ~3cm for pants-to-body gap (conservative middle estimate)
+  const estimatedCm = Math.round(inches * 2.54 + 3);
+  document.getElementById('waist').value = estimatedCm;
+  document.getElementById('pantsCm').value = Math.round(inches * 2.54);
+  document.getElementById('pantsNote').style.display = 'block';
+  document.getElementById('pantsNote').textContent = `換算結果：約 ${estimatedCm}cm（褲子${Math.round(inches*2.54)}cm + 約3cm修正）`;
+}
+function convertPantsCm(){
+  const cm = parseFloat(document.getElementById('pantsCm').value);
+  if(isNaN(cm)) return;
+  const estimatedCm = Math.round(cm + 3);
+  const inches = (cm / 2.54).toFixed(0);
+  document.getElementById('waist').value = estimatedCm;
+  document.getElementById('pantsSize').value = inches;
+  document.getElementById('pantsNote').style.display = 'block';
+  document.getElementById('pantsNote').textContent = `換算結果：約 ${estimatedCm}cm（褲子${cm}cm + 約3cm修正）`;
+}
+function clearPants(){
+  document.getElementById('pantsSize').value = '';
+  document.getElementById('pantsCm').value = '';
+  document.getElementById('pantsNote').style.display = 'none';
+}
+
+document.getElementById('height').addEventListener('input',autoBmi);
+document.getElementById('weight').addEventListener('input',autoBmi);
+</script>
+</body>
+</html>
