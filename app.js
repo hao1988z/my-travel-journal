@@ -12,6 +12,8 @@ const state = {
   editingTrip: null,
   selectedPhoto: null,
   photoPreviewUrl: null,
+  pendingEmail: "",
+  resendTimer: null,
   sharedMode: false,
   sharedTrip: null
 };
@@ -63,6 +65,7 @@ async function boot() {
 function bindEvents() {
   $("authForm").addEventListener("submit", signIn);
   $("signUpBtn").addEventListener("click", signUp);
+  setupResendButton();
   $("signOutBtn").addEventListener("click", signOut);
   $("newTripBtn").addEventListener("click", () => openTripDialog());
   $("closeDialogBtn").addEventListener("click", closeTripDialog);
@@ -71,6 +74,20 @@ function bindEvents() {
   $("deleteTripBtn").addEventListener("click", deleteCurrentTrip);
   $("photoInput").addEventListener("change", handlePhotoInput);
   $("searchInput").addEventListener("input", renderTrips);
+}
+
+function setupResendButton() {
+  const actions = $("authForm").querySelector(".auth-buttons");
+  if (!actions || $("resendEmailBtn")) return;
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.id = "resendEmailBtn";
+  button.className = "btn btn-soft";
+  button.textContent = "重新寄驗證信";
+  button.hidden = true;
+  button.addEventListener("click", resendVerificationEmail);
+  actions.appendChild(button);
 }
 
 function initMap() {
@@ -110,12 +127,67 @@ async function signUp() {
       password,
       options: { emailRedirectTo: authRedirectUrl }
     });
-    if (error) return toast(error.message);
+    if (error) {
+      if (/already|registered|exists/i.test(`${error.code || ""} ${error.message || ""}`)) {
+        showResendButton(email);
+        return toast("這個 Email 已註冊，請稍後按「重新寄驗證信」");
+      }
+      return toast(error.message);
+    }
+    showResendButton(email);
+    startResendCooldown();
     toast("帳號已建立，請檢查信箱驗證信");
   } catch (error) {
     console.error("[signUp]", error);
     toast("註冊失敗，請檢查網路或 Supabase 設定");
   }
+}
+
+function showResendButton(email) {
+  state.pendingEmail = email;
+  const button = $("resendEmailBtn");
+  if (button) button.hidden = false;
+}
+
+function startResendCooldown(seconds = 60) {
+  const button = $("resendEmailBtn");
+  if (!button) return;
+  clearInterval(state.resendTimer);
+  let remaining = seconds;
+  button.disabled = true;
+  button.textContent = `請稍候 ${remaining} 秒`;
+  state.resendTimer = setInterval(() => {
+    remaining -= 1;
+    if (remaining <= 0) {
+      clearInterval(state.resendTimer);
+      state.resendTimer = null;
+      button.disabled = false;
+      button.textContent = "重新寄驗證信";
+      return;
+    }
+    button.textContent = `請稍候 ${remaining} 秒`;
+  }, 1000);
+}
+
+async function resendVerificationEmail() {
+  if (missingConfig) return toast("請先設定 Supabase config.js");
+
+  const email = $("emailInput").value.trim().toLowerCase() || state.pendingEmail;
+  if (!email) return toast("請先輸入 Email");
+
+  const { error } = await client.auth.resend({
+    type: "signup",
+    email,
+    options: { emailRedirectTo: authRedirectUrl }
+  });
+  if (error) {
+    console.error("[resendVerificationEmail]", error);
+    return toast(error.message || "驗證信重新寄送失敗");
+  }
+
+  showResendButton(email);
+  startResendCooldown();
+  toast("驗證信已重新寄出，請檢查垃圾郵件");
 }
 
 async function signOut() {
