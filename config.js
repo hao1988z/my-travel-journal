@@ -1,5 +1,5 @@
 window.TRAVEL_JOURNAL_CONFIG = {
-  SUPABASE_URL: "https://YOUR_PROJECT_REF.supabase.co",
-  SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_KEY",
+  SUPABASE_URL: "https://xwijzpzyuetzporkfbpi.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_sb_secret_EaFc7LfERRuUfOsbBgj5cw_ZpajN0Ys",
   PHOTO_BUCKET: "trip-photos"
 };
