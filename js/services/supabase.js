@@ -1,0 +1,10 @@
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let mapInstance = null, markers = {}, trips = [], currentFilter = 'all', galleryQuery = '', pendingFiles = [], currentUser = null;
+let heatLayer = null, showHeat = false;
+let diaries = [], editingDiaryId = null, selectedMood = '', viewingDiaryId = null;
+let pendingCaptions = [], editingExistingPhotos = [];
+let lbPhotos = [], lbIdx = 0, lbTripId = null;
+let isManualLogout = false, mapMarkerGroup = null, editingTripId = null, shareMapInstance = null;
+let calYear = new Date().getFullYear(), calMonth = new Date().getMonth();
+const shareToken = new URLSearchParams(window.location.search).get('share');
+const isShareMode = Boolean(shareToken);

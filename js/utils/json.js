@@ -1,0 +1,2 @@
+function parsePhotosMeta(raw){ if(!raw)return[]; try{ const p=typeof raw==='string'?JSON.parse(raw):raw; return Array.isArray(p)?p.filter(x=>x&&x.path):[]; }catch(error){reportClientError('parsePhotosMeta',error);return[];} }
+function normalizePhotoMeta(photos){ return (Array.isArray(photos)?photos:[]).filter(p=>p&&typeof p.path==='string'&&p.path.trim()).map(p=>({path:p.path,caption:typeof p.caption==='string'?p.caption:''})); }
