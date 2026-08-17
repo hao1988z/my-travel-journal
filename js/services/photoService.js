@@ -4,6 +4,20 @@ async function signPhoto(path,exp=3600){
   if(error){reportClientError('signPhoto',error);return null;}
   return data?.signedUrl||null;
 }
+async function signPhotoList(photos,exp=3600,limit=4){
+  const result=new Array(photos.length);
+  let cursor=0;
+  async function worker(){
+    while(true){
+      const i=cursor++;
+      if(i>=photos.length)return;
+      const p=photos[i];
+      result[i]={...p,url:await signPhoto(p.path,exp)};
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(limit,photos.length)},()=>worker()));
+  return result;
+}
 async function removeStoragePhotos(paths,context='removeStoragePhotos'){
   const cleanPaths=[...new Set((paths||[]).filter(Boolean))];
   if(cleanPaths.length===0)return true;
@@ -64,7 +78,8 @@ async function loadExistingPhotos(tripId){
   document.getElementById('existing-photos-row').style.display='block';
   document.getElementById('existing-count').textContent=`（${photos.length} 張）`;
   const grid=document.getElementById('existing-photos-grid');
-  const withUrls=await Promise.all(photos.map(async(p,i)=>({...p,url:await signPhoto(p.path,1800),idx:i})));
+  const withUrls=await signPhotoList(photos,1800,4);
+  withUrls.forEach((p,i)=>{p.idx=i;});
   grid.innerHTML=withUrls.map((p,i)=>`<div class="prev-thumb existing-thumb" id="ep-${i}"><img src="${esc(p.url)}" alt=""><div style="position:absolute;top:2px;right:2px;"><button style="background:rgba(0,0,0,.65);color:#fff;border:none;border-radius:2px;width:18px;height:18px;font-size:11px;cursor:pointer;" onclick="removeExistingPhoto(${i})">×</button></div></div>`).join('');
 }
 
@@ -220,26 +235,57 @@ async function openPhotosForTrip(tripId){
   let photos=parsePhotosMeta(t.photos_meta);
   if(photos.length===0&&t.photo_count>0){showToast('此旅程的照片索引遺失，請重新編輯旅程以恢復照片。');return;}
   if(photos.length===0){showToast('這趟旅程還沒有照片');return;}
-  const withUrls=await Promise.all(photos.map(async p=>{const{data,error}=await sb.storage.from('photos').createSignedUrl(p.path,3600);if(error)reportClientError('openPhotosForTrip.signUrl',error);return{...p,url:data?.signedUrl||''};}));
+  const withUrls=await signPhotoList(photos,3600,4);
   lbPhotos=withUrls.filter(p=>p.url); lbIdx=0;
   renderLightbox(); document.getElementById('lightbox').classList.add('open');
-  // 非同步讀取所有照片的 EXIF（用 signed URL fetch）
-  lbPhotos.forEach(async (p, i) => {
-    try {
-      const res = await fetch(p.url);
-      if(!res.ok)throw new Error(`照片讀取失敗：${res.status}`);
-      const blob = await res.blob();
-      const file = new File([blob], p.path?.split('/').pop()||'photo.jpg', {type: blob.type});
-      p.exif = await readExif(file);
-      if (i === lbIdx) renderLbExif(p.exif);
-    } catch(e) { reportClientError('openPhotosForTrip.exif',e); }
-  });
+  loadLbExifForCurrent();
+}
+
+async function retryLbImage(img,p){
+  if(!p||p._urlRetrying||p._urlRetried)return;
+  p._urlRetrying=true;
+  try{
+    const fresh=await signPhoto(p.path,3600);
+    if(fresh){
+      p.url=fresh;
+      p._urlRetried=true;
+      img.src=fresh;
+      if(lbPhotos[lbIdx]===p)document.getElementById('lb-download').href=fresh;
+      document.querySelectorAll('.lb-thumb').forEach((thumb,i)=>{if(lbPhotos[i]===p)thumb.src=fresh;});
+      return;
+    }
+  }catch(e){reportClientError('retryLbImage',e);}
+  finally{p._urlRetrying=false;}
+  img.classList.add('photo-load-failed');
+}
+
+async function loadLbExifForCurrent(){
+  const p=lbPhotos[lbIdx];
+  if(!p||p._exifLoading||p._exifLoaded)return;
+  p._exifLoading=true;
+  try{
+    const res=await fetch(p.url,{cache:'no-store'});
+    if(!res.ok)throw new Error(`照片讀取失敗：${res.status}`);
+    const blob=await res.blob();
+    const file=new File([blob],p.path?.split('/').pop()||'photo.jpg',{type:blob.type});
+    p.exif=await readExif(file);
+    p._exifLoaded=true;
+  }catch(e){
+    reportClientError('openPhotosForTrip.exif',e);
+  }finally{
+    p._exifLoading=false;
+    if(lbPhotos[lbIdx]===p)renderLbExif(p.exif||null);
+  }
 }
 
 function renderLightbox(){
   if(lbPhotos.length===0)return;
   const p=lbPhotos[lbIdx];
-  document.getElementById('lb-img').src=p.url;
+  const mainImg=document.getElementById('lb-img');
+  mainImg.classList.remove('photo-load-failed');
+  mainImg.onerror=()=>retryLbImage(mainImg,p);
+  mainImg.onload=()=>mainImg.classList.remove('photo-load-failed');
+  mainImg.src=p.url;
   document.getElementById('lb-caption').value=p.caption||'';
   document.getElementById('lb-counter').textContent=`${lbIdx+1} / ${lbPhotos.length}`;
   const dl=document.getElementById('lb-download'); dl.href=p.url; dl.download=(p.path||'travel-photo.jpg').split('/').pop();
@@ -247,7 +293,10 @@ function renderLightbox(){
   renderLbExif(p.exif || null);
   const strip=document.getElementById('lb-thumbstrip');
   if(strip.children.length!==lbPhotos.length){
-    strip.innerHTML=lbPhotos.map((ph,i)=>`<img class="lb-thumb${i===lbIdx?' active':''}" src="${ph.url}" onclick="lbGoTo(${i})">`).join('');
+    strip.innerHTML=lbPhotos.map((ph,i)=>`<img class="lb-thumb${i===lbIdx?' active':''}" src="${ph.url}" loading="lazy" decoding="async" alt="" onclick="lbGoTo(${i})">`).join('');
+    strip.querySelectorAll('.lb-thumb').forEach((thumb,i)=>{
+      thumb.onerror=()=>retryLbImage(thumb,lbPhotos[i]);
+    });
   } else { strip.querySelectorAll('.lb-thumb').forEach((el,i)=>el.classList.toggle('active',i===lbIdx)); }
   const activeThumb=strip.querySelectorAll('.lb-thumb')[lbIdx];
   if(activeThumb)activeThumb.scrollIntoView({inline:'center',behavior:'smooth'});
@@ -257,13 +306,13 @@ function lbNav(dir){
   lbIdx=(lbIdx+dir+lbPhotos.length)%lbPhotos.length;
   const img=document.getElementById('lb-img');
   img.style.opacity='0';
-  setTimeout(()=>{renderLightbox();img.style.opacity='';},150);
+  setTimeout(()=>{renderLightbox();img.style.opacity='';loadLbExifForCurrent();},150);
 }
 function lbGoTo(i){
   lbIdx=i;
   const img=document.getElementById('lb-img');
   img.style.opacity='0';
-  setTimeout(()=>{renderLightbox();img.style.opacity='';},150);
+  setTimeout(()=>{renderLightbox();img.style.opacity='';loadLbExifForCurrent();},150);
 }
 function closeLightbox(){document.getElementById('lightbox').classList.remove('open');}
 
