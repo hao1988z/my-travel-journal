@@ -328,6 +328,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 .toast.show{transform:translateX(-50%) translateY(0);}
 .custom-marker{cursor:pointer;}
 .marker-pin{width:46px;height:46px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2.5px solid var(--ink);overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.22);}
+.footprint-marker{background:transparent;border:0;}
+.footprint-pin{width:42px;height:42px;display:flex;align-items:center;justify-content:center;border:2px solid var(--accent);border-radius:50%;overflow:hidden;background:var(--accent-light);box-shadow:0 5px 16px rgba(226,106,37,.28);font-size:20px;}
+.footprint-pin img{width:100%;height:100%;object-fit:cover;display:block;}
 .mpopup{text-align:center;min-width:130px;}
 .mpopup-name{font-size:12px;font-weight:600;}
 .mpopup-meta{font-family:'DM Mono',monospace;font-size:9px;color:var(--ink-muted);margin-top:2px;}
@@ -535,6 +538,81 @@ header{
 
 #map-view{height:calc(100vh - 68px);}
 
+.header-search-btn{width:34px;height:34px;border:1px solid rgba(245,240,232,.26);border-radius:50%;background:rgba(255,255,255,.06);color:var(--sand);font-size:21px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s ease,border-color .2s ease,transform .2s ease;}
+.header-search-btn:hover{background:rgba(226,106,37,.2);border-color:var(--accent);transform:translateY(-1px);}
+.feature-page{padding:32px 28px 48px;max-width:1280px;margin:0 auto;}
+.feature-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:24px;}
+.feature-kicker{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.14em;color:var(--accent);text-transform:uppercase;margin-bottom:7px;}
+.feature-title{font-size:28px;font-weight:600;line-height:1.3;}
+.feature-sub{font-size:12px;color:var(--ink-muted);margin-top:5px;line-height:1.7;}
+.feature-select{min-width:130px;border:1px solid var(--sand-dark);border-radius:var(--r-md);background:#fff;color:var(--ink);padding:9px 12px;font-size:12px;outline:none;}
+.footprint-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px;}
+.footprint-stat{background:#fff;border:1px solid var(--sand-dark);border-radius:var(--r-lg);padding:14px 16px;}
+.footprint-stat b{display:block;color:var(--accent);font-family:'DM Mono',monospace;font-size:24px;font-weight:400;}
+.footprint-stat span{display:block;color:var(--ink-muted);font-size:11px;margin-top:4px;}
+.footprints-layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:18px;align-items:start;}
+.feature-map{height:500px;border:1px solid var(--sand-dark);border-radius:var(--r-lg);overflow:hidden;background:var(--sand-dark);box-shadow:var(--shadow-sm);}
+.footprint-list{display:flex;flex-direction:column;gap:10px;max-height:500px;overflow:auto;padding-right:3px;}
+.footprint-country{background:#fff;border:1px solid var(--sand-dark);border-radius:var(--r-lg);padding:14px 16px;}
+.footprint-country-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;}
+.footprint-country-name{font-size:15px;font-weight:600;}
+.footprint-country-count{font-family:'DM Mono',monospace;font-size:9px;color:var(--accent);white-space:nowrap;}
+.footprint-places{display:flex;flex-wrap:wrap;gap:6px;}
+.footprint-place{border:1px solid var(--sand-dark);border-radius:999px;padding:4px 8px;color:var(--ink-muted);font-family:'DM Mono',monospace;font-size:9px;cursor:pointer;background:var(--sand);}
+.footprint-place:hover{border-color:var(--accent);color:var(--accent);}
+.story-route{position:relative;display:flex;flex-direction:column;gap:0;max-width:900px;margin:0 auto;}
+.story-route:before{content:'';position:absolute;top:16px;bottom:20px;left:116px;width:2px;background:var(--sand-dark);}
+.story-day{position:relative;display:grid;grid-template-columns:92px 26px minmax(0,1fr);gap:0;min-height:150px;}
+.story-date{padding:3px 16px 0 0;text-align:right;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink-muted);line-height:1.6;}
+.story-dot{position:relative;z-index:1;width:13px;height:13px;margin:3px auto 0;border-radius:50%;background:var(--accent);border:3px solid var(--sand);box-shadow:0 0 0 2px var(--accent);}
+.story-body{padding:0 0 28px 18px;min-width:0;}
+.story-card{display:flex;gap:14px;align-items:stretch;background:#fff;border:1px solid var(--sand-dark);border-radius:var(--r-lg);padding:12px;cursor:pointer;box-shadow:var(--shadow-sm);transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;}
+.story-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:rgba(226,106,37,.3);}
+.story-cover{width:118px;min-height:110px;flex:0 0 118px;border-radius:var(--r-md);overflow:hidden;background:var(--accent-light);display:flex;align-items:center;justify-content:center;font-size:30px;}
+.story-cover img{width:100%;height:100%;object-fit:cover;display:block;}
+.story-copy{min-width:0;padding:3px 2px;}
+.story-day-label{font-family:'DM Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;}
+.story-name{font-size:16px;font-weight:600;line-height:1.45;}
+.story-meta{font-family:'DM Mono',monospace;font-size:9px;color:var(--ink-muted);margin-top:6px;line-height:1.7;}
+.story-diary{margin-top:10px;padding-top:9px;border-top:1px solid var(--sand-dark);font-size:11px;color:var(--ink-muted);line-height:1.7;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.story-diary b{color:var(--ink);font-weight:600;}
+.story-empty{background:#fff;border:1px dashed var(--sand-dark);border-radius:var(--r-lg);padding:42px 24px;text-align:center;color:var(--ink-muted);line-height:1.8;}
+.story-empty b{display:block;color:var(--ink);font-size:17px;margin-bottom:5px;}
+.global-search-ov{position:fixed;inset:0;z-index:650;display:none;align-items:flex-start;justify-content:center;padding:10vh 18px 24px;background:rgba(26,20,16,.64);backdrop-filter:blur(8px);}
+.global-search-ov.open{display:flex;}
+.global-search-panel{width:min(680px,100%);max-height:78vh;overflow:auto;background:var(--sand);border:1px solid rgba(255,255,255,.55);border-radius:var(--r-lg);box-shadow:var(--shadow-lg);padding:22px;}
+.global-search-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;}
+.global-search-title{font-size:22px;font-weight:600;}
+.global-search-input{width:100%;min-height:48px;border:1px solid var(--sand-dark);border-radius:var(--r-md);background:#fff;color:var(--ink);padding:11px 14px;font-size:14px;outline:none;}
+.global-search-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(226,106,37,.12);}
+.global-search-hint{font-size:11px;color:var(--ink-muted);line-height:1.7;margin:8px 2px 14px;}
+.global-search-group{margin-top:16px;}
+.global-search-group-title{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;margin-bottom:7px;}
+.global-search-result{width:100%;display:flex;align-items:center;gap:10px;border:1px solid transparent;border-radius:var(--r-md);background:rgba(255,255,255,.72);padding:10px;text-align:left;cursor:pointer;color:var(--ink);}
+.global-search-result:hover{border-color:var(--accent);background:#fff;}
+.global-search-result-icon{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-sm);background:var(--accent-light);font-size:18px;flex-shrink:0;overflow:hidden;}
+.global-search-result-icon img{width:100%;height:100%;object-fit:cover;}
+.global-search-result-copy{min-width:0;flex:1;}
+.global-search-result-title{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.global-search-result-meta{font-family:'DM Mono',monospace;font-size:9px;color:var(--ink-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px;}
+.global-search-empty{padding:24px 10px;text-align:center;color:var(--ink-muted);font-size:12px;line-height:1.8;}
+.today-memory{margin:0 0 24px;padding:18px;background:linear-gradient(135deg,rgba(251,240,233,.92),rgba(255,255,255,.9));border:1px solid rgba(226,106,37,.28);border-radius:var(--r-lg);box-shadow:var(--shadow-sm);}
+.today-memory-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:13px;}
+.today-memory-title{font-size:19px;font-weight:600;}
+.today-memory-sub{font-size:11px;color:var(--ink-muted);margin-top:3px;}
+.today-memory-count{font-family:'DM Mono',monospace;font-size:9px;color:var(--accent);white-space:nowrap;}
+.today-memory-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:9px;}
+.today-memory-card{width:100%;display:flex;align-items:center;gap:10px;padding:10px;text-align:left;border:1px solid rgba(226,106,37,.16);border-radius:var(--r-md);background:rgba(255,255,255,.78);cursor:pointer;color:var(--ink);transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;}
+.today-memory-card:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:var(--shadow-sm);}
+.today-memory-cover{width:54px;height:54px;display:flex;align-items:center;justify-content:center;flex:0 0 54px;overflow:hidden;border-radius:var(--r-md);background:var(--accent-light);font-size:24px;}
+.today-memory-cover img{width:100%;height:100%;object-fit:cover;display:block;}
+.diary-memory-cover{font-size:25px;}
+.today-memory-copy{min-width:0;display:flex;flex-direction:column;flex:1;}
+.today-memory-type{font-family:'DM Mono',monospace;font-size:8px;color:var(--accent);letter-spacing:.04em;margin-bottom:3px;}
+.today-memory-copy strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.today-memory-meta{font-family:'DM Mono',monospace;font-size:9px;color:var(--ink-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px;}
+.today-memory-arrow{color:var(--accent);font-size:15px;padding:0 3px;}
+
 .modal{
   border-radius:var(--r-lg);
   box-shadow:var(--shadow-lg);
@@ -684,6 +762,25 @@ textarea:focus,
   .tc-cover{
     height:210px;
   }
+  .header-search-btn{width:32px;height:32px;}
+  .feature-page{padding:24px 16px 36px;}
+  .feature-head{align-items:flex-start;flex-direction:column;margin-bottom:18px;}
+  .feature-title{font-size:24px;}
+  .feature-select{width:100%;}
+  .footprint-stats{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .footprints-layout{grid-template-columns:1fr;}
+  .feature-map{height:320px;}
+  .footprint-list{max-height:none;}
+  .story-route:before{left:17px;}
+  .story-day{grid-template-columns:26px minmax(0,1fr);}
+  .story-date{grid-column:2;grid-row:1;padding:0 0 5px;text-align:left;}
+  .story-dot{grid-column:1;grid-row:1;margin:3px auto 0;}
+  .story-body{grid-column:2;grid-row:2;padding:0 0 24px;}
+  .story-card{gap:10px;padding:10px;}
+  .story-cover{width:84px;min-height:92px;flex-basis:84px;}
+  .story-name{font-size:14px;}
+  .global-search-ov{padding:7vh 12px 18px;}
+  .global-search-panel{padding:18px;max-height:84vh;}
 }
 </style>
 </head>
@@ -738,12 +835,15 @@ textarea:focus,
     <nav>
       <button class="nav-btn" id="nb-map" onclick="showView('map')">地圖</button>
       <button class="nav-btn active" id="nb-gallery" onclick="showView('gallery')">相簿</button>
+      <button class="nav-btn" id="nb-footprints" onclick="showView('footprints')">足跡</button>
+      <button class="nav-btn" id="nb-stories" onclick="showView('stories')">故事</button>
       <button class="nav-btn" id="nb-diary" onclick="showView('diary')">日記</button>
       <button class="nav-btn" id="nb-stats" onclick="showView('stats')">統計</button>
       <button class="nav-btn" id="nb-timeline" onclick="showView('timeline')">時間軸</button>
     </nav>
     <div class="header-right">
       <span class="user-info" id="user-email-display"></span>
+      <button class="header-search-btn" type="button" title="全站搜尋" aria-label="全站搜尋" onclick="openGlobalSearch()">⌕</button>
       <button class="upload-btn" onclick="openUpload()">＋ 新增旅程</button>
       <button class="upload-btn" style="background:none;border:1px solid #444;color:#888;" onclick="doLogout()">登出</button>
     </div>
@@ -814,6 +914,42 @@ textarea:focus,
     </div><!-- /inner wrapper -->
   </div><!-- /gallery-view -->
 
+  <!-- FOOTPRINTS VIEW -->
+  <div id="footprints-view" class="view">
+    <div class="feature-page footprints-page">
+      <div class="feature-head">
+        <div>
+          <div class="feature-kicker">MY FOOTPRINTS</div>
+          <div class="feature-title">我走過的地方</div>
+          <div class="feature-sub">把旅程累積成一張屬於自己的足跡。</div>
+        </div>
+        <select class="feature-select" id="footprints-filter" onchange="renderFootprints()">
+          <option value="">全部國家</option>
+        </select>
+      </div>
+      <div class="footprint-stats" id="footprint-stats"></div>
+      <div class="footprints-layout">
+        <div class="feature-map" id="footprints-map"></div>
+        <div class="footprint-list" id="footprint-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STORIES VIEW -->
+  <div id="stories-view" class="view">
+    <div class="feature-page stories-page">
+      <div class="feature-head">
+        <div>
+          <div class="feature-kicker">TRAVEL STORY</div>
+          <div class="feature-title">旅行故事路線</div>
+          <div class="feature-sub">按照時間，重新走一遍你曾經走過的路。</div>
+        </div>
+        <button class="quick-btn" type="button" onclick="showView('gallery')">回到相簿</button>
+      </div>
+      <div class="story-route" id="story-route"></div>
+    </div>
+  </div>
+
   <div id="diary-view" class="view">
     <div style="padding:28px;max-width:900px;margin:0 auto;">
     <div class="diary-header">
@@ -846,6 +982,22 @@ textarea:focus,
       </div>
       <div class="timeline" id="timeline-list"></div>
     </div>
+  </div>
+</div>
+
+<!-- GLOBAL SEARCH -->
+<div class="global-search-ov" id="global-search" role="dialog" aria-modal="true" aria-label="全站搜尋">
+  <div class="global-search-panel">
+    <div class="global-search-head">
+      <div>
+        <div class="feature-kicker">SEARCH MEMORY</div>
+        <div class="global-search-title">搜尋我的旅行</div>
+      </div>
+      <button class="modal-close" type="button" onclick="closeGlobalSearch()" aria-label="關閉搜尋">×</button>
+    </div>
+    <input class="global-search-input" id="global-search-input" type="search" placeholder="搜尋旅程、城市、日記、照片說明..." autocomplete="off" oninput="renderGlobalSearch(this.value)">
+    <div class="global-search-hint">可以搜尋旅程名稱、地點、國家、日期、日記內容和照片說明。</div>
+    <div class="global-search-results" id="global-search-results"></div>
   </div>
 </div>
 
@@ -1030,6 +1182,7 @@ let isManualLogout = false;
 let mapMarkerGroup = null;
 let editingTripId = null;
 let shareMapInstance = null;
+let footprintsMapInstance = null, footprintMarkers = [];
 const shareToken = new URLSearchParams(window.location.search).get('share');
 const isShareMode = Boolean(shareToken);
 
@@ -1210,6 +1363,8 @@ async function loadTrips() {
   updateStats();
   if (mapInstance) renderMapMarkers();
   renderGallery(currentFilter);
+  if (document.getElementById('footprints-view')?.classList.contains('active')) renderFootprints();
+  if (document.getElementById('stories-view')?.classList.contains('active')) renderStoryRoute();
   await loadDiaries();
 }
 
@@ -1343,31 +1498,136 @@ function renderTodayHistory() {
   const mm = String(today.getMonth()+1).padStart(2,'0');
   const dd = String(today.getDate()).padStart(2,'0');
   const todayMMDD = mm + '-' + dd;
-  // 閏年 2/29：非閏年時也顯示 2/28 的旅程
   const isLeapDay = todayMMDD === '02-29';
   const matches = trips.filter(t => {
     if (!t.date_start) return false;
     const tripMMDD = t.date_start.slice(5);
     const tripYear = t.date_start.slice(0,4);
-    if (tripYear === String(today.getFullYear())) return false; // 今年的不算回顧
+    if (tripYear === String(today.getFullYear())) return false;
     if (tripMMDD === todayMMDD) return true;
-    if (isLeapDay && tripMMDD === '02-28') return true; // 非閏年用 2/28 補位
+    if (isLeapDay && tripMMDD === '02-28') return true;
     return false;
   });
-  if (matches.length === 0) { el.innerHTML = ''; return; }
+  const diaryMatches = diaries.filter(d => {
+    if (!d.diary_date) return false;
+    const diaryMMDD = d.diary_date.slice(5);
+    const diaryYear = d.diary_date.slice(0,4);
+    if (diaryYear === String(today.getFullYear())) return false;
+    return diaryMMDD === todayMMDD || (isLeapDay && diaryMMDD === '02-28');
+  });
+  if (matches.length === 0 && diaryMatches.length === 0) { el.innerHTML = ''; return; }
+
   const emojis = ['🗺️','🌅','🏔️','🌊','🌸','🏯','🗼','🏛️'];
-  el.innerHTML = matches.map(t => {
+  const tripCards = matches.map(t => {
     const em = emojis[Math.abs((t.name||'').charCodeAt(0)) % emojis.length];
     const yearsAgo = today.getFullYear() - parseInt(t.date_start.slice(0,4));
-    return `<div class="today-card" onclick="openPhotosForTrip('${t.id}')">
-      <div class="today-icon">${t.cover_url ? `<img src="${esc(t.cover_url)}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;">` : em}</div>
-      <div>
-        <div class="today-label">📅 ${yearsAgo} 年前的今天</div>
-        <div class="today-name">${esc(t.name)}</div>
-        <div class="today-meta">📍 ${esc(t.location||'')}${t.country ? ' · '+esc(t.country) : ''}</div>
-      </div>
-    </div>`;
+    return `<button class="today-memory-card" type="button" onclick="openPhotosForTrip('${esc(t.id)}')">
+      <span class="today-memory-cover">${t.cover_url ? `<img src="${esc(t.cover_url)}" alt="">` : em}</span>
+      <span class="today-memory-copy">
+        <span class="today-memory-type">📅 ${yearsAgo} 年前的今天 · 旅程</span>
+        <strong>${esc(t.name || '未命名旅程')}</strong>
+        <span class="today-memory-meta">📍 ${esc(t.location||'')}${t.country ? ' · '+esc(t.country) : ''}</span>
+      </span>
+      <span class="today-memory-arrow">→</span>
+    </button>`;
   }).join('');
+  const diaryCards = diaryMatches.map(d => {
+    const trip = trips.find(t => t.id === d.trip_id);
+    const yearsAgo = today.getFullYear() - parseInt(d.diary_date.slice(0,4));
+    const preview = (d.content || '').trim();
+    return `<button class="today-memory-card diary-memory-card" type="button" onclick="openDiaryDetail('${esc(d.id)}')">
+      <span class="today-memory-cover diary-memory-cover">${esc(d.mood || '📝')}</span>
+      <span class="today-memory-copy">
+        <span class="today-memory-type">📝 ${yearsAgo} 年前的今天 · 日記</span>
+        <strong>${esc(d.title || '未命名日記')}</strong>
+        <span class="today-memory-meta">${esc(trip ? trip.name : (preview || '留下的一段心情'))}</span>
+      </span>
+      <span class="today-memory-arrow">→</span>
+    </button>`;
+  }).join('');
+  el.innerHTML = `<section class="today-memory">
+    <div class="today-memory-head">
+      <div>
+        <div class="feature-kicker">ON THIS DAY</div>
+        <div class="today-memory-title">回憶這一天</div>
+        <div class="today-memory-sub">${today.getMonth()+1} 月 ${today.getDate()} 日，重新遇見過去的自己。</div>
+      </div>
+      <span class="today-memory-count">${matches.length + diaryMatches.length} 則回憶</span>
+    </div>
+    <div class="today-memory-grid">${tripCards}${diaryCards}</div>
+  </section>`;
+}
+
+function openGlobalSearch() {
+  const overlay = document.getElementById('global-search');
+  const input = document.getElementById('global-search-input');
+  if (!overlay || !input) return;
+  overlay.classList.add('open');
+  input.value = '';
+  renderGlobalSearch('');
+  setTimeout(() => input.focus(), 30);
+}
+
+function closeGlobalSearch() {
+  document.getElementById('global-search')?.classList.remove('open');
+}
+
+function globalSearchOpenTrip(id) {
+  closeGlobalSearch();
+  openPhotosForTrip(id);
+}
+
+function globalSearchOpenDiary(id) {
+  closeGlobalSearch();
+  openDiaryDetail(id);
+}
+
+function renderGlobalSearch(value) {
+  const resultsEl = document.getElementById('global-search-results');
+  if (!resultsEl) return;
+  const query = String(value || '').trim().toLowerCase();
+  if (!query) {
+    resultsEl.innerHTML = '<div class="global-search-empty">輸入旅程、城市、日期、日記或照片說明，開始找回一段回憶。</div>';
+    return;
+  }
+  const hay = (...values) => values.filter(Boolean).join(' ').toLowerCase();
+  const groups = [];
+  const tripMatches = trips.filter(t => hay(t.name, t.location, t.country, t.date_start, t.date_end).includes(query)).slice(0, 8);
+  if (tripMatches.length) groups.push({
+    title: '旅程',
+    items: tripMatches.map(t => `<button class="global-search-result" type="button" onclick="globalSearchOpenTrip('${esc(t.id)}')">
+      <span class="global-search-result-icon">${t.cover_url ? `<img src="${esc(t.cover_url)}" alt="">` : '🧳'}</span>
+      <span class="global-search-result-copy"><span class="global-search-result-title">${esc(t.name || '未命名旅程')}</span><span class="global-search-result-meta">${esc([t.location, t.country, t.date_start].filter(Boolean).join(' · '))}</span></span>
+    </button>`)
+  });
+
+  const diaryMatches = diaries.filter(d => {
+    const trip = trips.find(t => t.id === d.trip_id);
+    return hay(d.title, d.content, d.diary_date, d.mood, trip?.name).includes(query);
+  }).slice(0, 8);
+  if (diaryMatches.length) groups.push({
+    title: '日記',
+    items: diaryMatches.map(d => {
+      const trip = trips.find(t => t.id === d.trip_id);
+      return `<button class="global-search-result" type="button" onclick="globalSearchOpenDiary('${esc(d.id)}')">
+        <span class="global-search-result-icon">${esc(d.mood || '📝')}</span>
+        <span class="global-search-result-copy"><span class="global-search-result-title">${esc(d.title || '未命名日記')}</span><span class="global-search-result-meta">${esc([d.diary_date, trip?.name].filter(Boolean).join(' · '))}</span></span>
+      </button>`;
+    })
+  });
+
+  const photoMatches = trips.flatMap(t => parsePhotosMeta(t.photos_meta).filter(p => p.caption && String(p.caption).toLowerCase().includes(query)).map(p => ({ trip:t, photo:p }))).slice(0, 8);
+  if (photoMatches.length) groups.push({
+    title: '照片說明',
+    items: photoMatches.map(({trip, photo}) => `<button class="global-search-result" type="button" onclick="globalSearchOpenTrip('${esc(trip.id)}')">
+      <span class="global-search-result-icon">${trip.cover_url ? `<img src="${esc(trip.cover_url)}" alt="">` : '📷'}</span>
+      <span class="global-search-result-copy"><span class="global-search-result-title">${esc(photo.caption)}</span><span class="global-search-result-meta">📍 ${esc(trip.name || '未命名旅程')}</span></span>
+    </button>`)
+  });
+
+  resultsEl.innerHTML = groups.length
+    ? groups.map(group => `<section class="global-search-group"><div class="global-search-group-title">${group.title}</div>${group.items.join('')}</section>`).join('')
+    : '<div class="global-search-empty">找不到相關內容。試試城市、國家或日記中的關鍵字。</div>';
 }
 
 function renderGallery(filter) {
@@ -1777,6 +2037,116 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeLightbox();
 });
 
+document.addEventListener('keydown', e => {
+  const tag = document.activeElement?.tagName;
+  if (e.key === '/' && !['INPUT','TEXTAREA','SELECT'].includes(tag) && !document.getElementById('global-search')?.classList.contains('open')) {
+    e.preventDefault();
+    openGlobalSearch();
+  }
+  if (e.key === 'Escape') closeGlobalSearch();
+});
+
+// ── FOOTPRINTS & TRAVEL STORY ──
+function initFootprintsMap() {
+  if (footprintsMapInstance) return;
+  footprintsMapInstance = L.map('footprints-map', { zoomControl: false }).setView([25, 15], 2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 18
+  }).addTo(footprintsMapInstance);
+  L.control.zoom({ position: 'topleft' }).addTo(footprintsMapInstance);
+}
+
+function renderFootprints() {
+  const list = document.getElementById('footprint-list');
+  const stats = document.getElementById('footprint-stats');
+  const select = document.getElementById('footprints-filter');
+  if (!list || !stats || !select) return;
+  const countries = [...new Set(trips.map(t => t.country).filter(Boolean))].sort();
+  const currentCountry = select.value;
+  select.innerHTML = '<option value="">全部國家</option>' + countries.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  if (countries.includes(currentCountry)) select.value = currentCountry;
+  const filtered = currentCountry ? trips.filter(t => t.country === currentCountry) : trips;
+  const places = new Set(filtered.map(t => t.location).filter(Boolean));
+  const filteredCountries = new Set(filtered.map(t => t.country).filter(Boolean));
+  const photos = filtered.reduce((sum, t) => sum + (t.photo_count || parsePhotosMeta(t.photos_meta).length || 0), 0);
+  stats.innerHTML = [
+    ['旅程', filtered.length],
+    ['國家', filteredCountries.size],
+    ['城市與景點', places.size],
+    ['照片', photos.toLocaleString()]
+  ].map(([label, value]) => `<div class="footprint-stat"><b>${value}</b><span>${label}</span></div>`).join('');
+
+  const grouped = {};
+  filtered.forEach(t => {
+    const country = t.country || '未標注國家';
+    const place = t.location || '未標注地點';
+    if (!grouped[country]) grouped[country] = { trips: 0, places: new Map() };
+    grouped[country].trips++;
+    if (!grouped[country].places.has(place)) grouped[country].places.set(place, t.id);
+  });
+  const sortedGroups = Object.entries(grouped).sort((a, b) => b[1].trips - a[1].trips);
+  list.innerHTML = sortedGroups.length ? sortedGroups.map(([country, group]) => `<section class="footprint-country">
+    <div class="footprint-country-head"><div class="footprint-country-name">🌍 ${esc(country)}</div><div class="footprint-country-count">${group.trips} 趟旅程</div></div>
+    <div class="footprint-places">${[...group.places.entries()].map(([place, id]) => `<button class="footprint-place" type="button" onclick="openPhotosForTrip('${esc(id)}')">${esc(place)}</button>`).join('')}</div>
+  </section>`).join('') : '<div class="story-empty"><b>還沒有足跡</b>新增第一趟旅程並填寫地點，這裡就會開始長出你的旅行地圖。</div>';
+
+  initFootprintsMap();
+  footprintMarkers.forEach(marker => footprintsMapInstance.removeLayer(marker));
+  footprintMarkers = [];
+  const points = [];
+  filtered.forEach(t => {
+    if (!t.lat || !t.lng) return;
+    const marker = L.marker([t.lat, t.lng], { icon: makeFootprintIcon(t) }).addTo(footprintsMapInstance);
+    marker.bindPopup(`<div class="mpopup"><div class="mpopup-name">${esc(t.name || '未命名旅程')}</div><div class="mpopup-meta">${esc(t.location || '')}${t.country ? ' · ' + esc(t.country) : ''}</div><button class="mpopup-btn" onclick="openPhotosForTrip('${esc(t.id)}')">查看照片</button></div>`);
+    footprintMarkers.push(marker);
+    points.push([t.lat, t.lng]);
+  });
+  if (points.length === 1) footprintsMapInstance.setView(points[0], 7);
+  else if (points.length > 1) footprintsMapInstance.fitBounds(points, { padding: [36, 36], maxZoom: 8 });
+  else footprintsMapInstance.setView([25, 15], 2);
+  setTimeout(() => footprintsMapInstance?.invalidateSize(), 60);
+}
+
+function makeFootprintIcon(trip) {
+  const em = ['🗺️','🌅','🏔️','🌊','🌸','🏯','🗼','🏛️'][Math.abs((trip.name || '').charCodeAt(0)) % 8];
+  return L.divIcon({
+    className: 'footprint-marker',
+    html: `<div class="footprint-pin">${trip.cover_url ? `<img src="${esc(trip.cover_url)}" alt="">` : `<span>${em}</span>`}</div>`,
+    iconSize: [42, 42], iconAnchor: [21, 21]
+  });
+}
+
+function renderStoryRoute() {
+  const route = document.getElementById('story-route');
+  if (!route) return;
+  const sorted = [...trips].sort((a, b) => String(a.date_start || a.created_at || '').localeCompare(String(b.date_start || b.created_at || '')));
+  if (!sorted.length) {
+    route.innerHTML = '<div class="story-empty"><b>還沒有旅行故事</b>新增旅程、日期和日記後，這裡會把它們串成一條路線。</div>';
+    return;
+  }
+  route.innerHTML = sorted.map((t, index) => {
+    const related = diaries.filter(d => d.trip_id === t.id).sort((a, b) => String(a.diary_date || '').localeCompare(String(b.diary_date || '')));
+    const diary = related[0];
+    const date = t.date_start || t.created_at?.slice(0, 10) || '未知日期';
+    const meta = [t.location, t.country, t.date_end && t.date_end !== t.date_start ? `至 ${t.date_end}` : '', `${t.photo_count || 0} 張照片`].filter(Boolean).join(' · ');
+    return `<article class="story-day">
+      <div class="story-date">${esc(date)}<br><span>第 ${index + 1} 段</span></div>
+      <div class="story-dot" aria-hidden="true"></div>
+      <div class="story-body">
+        <div class="story-card" onclick="openPhotosForTrip('${esc(t.id)}')">
+          <div class="story-cover">${t.cover_url ? `<img src="${esc(t.cover_url)}" alt="">` : '🧳'}</div>
+          <div class="story-copy">
+            <div class="story-day-label">${index === 0 ? 'STORY BEGINS' : 'NEXT MEMORY'}</div>
+            <div class="story-name">${esc(t.name || '未命名旅程')}</div>
+            <div class="story-meta">${esc(meta)}</div>
+            ${diary ? `<div class="story-diary"><b>${esc(diary.mood || '📝')} ${esc(diary.title || '一段日記')}</b><br>${esc((diary.content || '留下了一段文字。').slice(0, 120))}</div>` : ''}
+          </div>
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+}
+
 // ── 4. MOOD STATS ──
 function renderStats() {
   const moodDefs = [
@@ -1883,6 +2253,8 @@ async function loadDiaries() {
   const { data } = await sb.from('diaries').select('*').order('diary_date', { ascending: false });
   diaries = data || [];
   renderDiary();
+  renderTodayHistory();
+  if (document.getElementById('stories-view')?.classList.contains('active')) renderStoryRoute();
 }
 
 function renderDiary() {
@@ -2099,14 +2471,16 @@ function showView(v) {
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.querySelector('nav')?.classList.remove('open');
-  document.getElementById(v+'-view').classList.add('active');
-  document.getElementById('nb-'+v).classList.add('active');
+  document.getElementById(v+'-view')?.classList.add('active');
+  document.getElementById('nb-'+v)?.classList.add('active');
   if (v==='gallery') { restoreFilterState(); renderGallery(currentFilter); }
   if (v==='diary') renderDiary();
   if (v==='map') {
     if (!mapInstance) { initMap(); renderMapMarkers(); renderSidebar(); updateStats(); }
     setTimeout(()=>mapInstance?.invalidateSize(),50);
   }
+  if (v==='footprints') { renderFootprints(); }
+  if (v==='stories') { renderStoryRoute(); }
   if (v==='stats') renderStats();
   if (v==='timeline') renderTimeline();
 }
