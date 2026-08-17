@@ -2,6 +2,7 @@ const cfg = window.TRAVEL_JOURNAL_CONFIG || {};
 const missingConfig = !cfg.SUPABASE_URL || cfg.SUPABASE_URL.includes("YOUR_PROJECT_REF");
 const client = missingConfig ? null : supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 const bucket = cfg.PHOTO_BUCKET || "trip-photos";
+const authRedirectUrl = cfg.AUTH_REDIRECT_URL || new URL("./", window.location.href).toString();
 
 const state = {
   user: null,
@@ -84,7 +85,7 @@ async function signIn(event) {
   event.preventDefault();
   if (missingConfig) return toast("請先設定 Supabase config.js");
 
-  const email = $("emailInput").value.trim();
+  const email = $("emailInput").value.trim().toLowerCase();
   const password = $("passwordInput").value;
   try {
     const { error } = await client.auth.signInWithPassword({ email, password });
@@ -99,12 +100,16 @@ async function signIn(event) {
 async function signUp() {
   if (missingConfig) return toast("請先設定 Supabase config.js");
 
-  const email = $("emailInput").value.trim();
+  const email = $("emailInput").value.trim().toLowerCase();
   const password = $("passwordInput").value;
   if (!email || password.length < 6) return toast("請輸入 Email 與至少 6 個字元的密碼");
 
   try {
-    const { error } = await client.auth.signUp({ email, password });
+    const { error } = await client.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: authRedirectUrl }
+    });
     if (error) return toast(error.message);
     toast("帳號已建立，請檢查信箱驗證信");
   } catch (error) {
