@@ -108,6 +108,20 @@ function bindEvents() {
   });
   $("searchInput").addEventListener("input", renderTrips);
   document.addEventListener("click", closeTripCardMenus);
+  document.querySelectorAll("[data-mobile-nav]").forEach((button) => {
+    button.addEventListener("click", () => handleMobileNavigation(button.dataset.mobileNav));
+  });
+  $("mobileAddBtn").addEventListener("click", () => openActionSheet("quickActionSheet"));
+  $("closeQuickActionBtn").addEventListener("click", () => $("quickActionSheet").close());
+  $("closeMoreMenuBtn").addEventListener("click", () => $("moreMenuSheet").close());
+  $("closeSettingsBtn").addEventListener("click", () => $("settingsSheet").close());
+  $("mobileSignOutBtn").addEventListener("click", signOut);
+  document.querySelectorAll("[data-quick-action]").forEach((button) => {
+    button.addEventListener("click", () => handleQuickAction(button.dataset.quickAction));
+  });
+  document.querySelectorAll("[data-more-action]").forEach((button) => {
+    button.addEventListener("click", () => handleMoreAction(button.dataset.moreAction));
+  });
 }
 
 function setupResendButton() {
@@ -227,6 +241,7 @@ async function resendVerificationEmail() {
 async function signOut() {
   const { error } = await client.auth.signOut();
   if (error) return toast(error.message);
+  closeActionSheets();
   state.trips = [];
   state.diaries = [];
   state.photoUrls.clear();
@@ -242,8 +257,123 @@ function setSessionUI() {
   $("appShell").hidden = !signedIn;
   if (!signedIn) closeTripDetail();
   $("signOutBtn").hidden = !signedIn;
+  $("mobileBottomNav").hidden = !signedIn || state.sharedMode;
+  $("settingsEmail").textContent = state.user?.email || "登入帳號";
   $("sessionStatus").textContent = signedIn ? `私人雲端 · ${state.user.email}` : "私人雲端";
   if (signedIn) setTimeout(() => map.invalidateSize(), 80);
+}
+
+function handleMobileNavigation(destination) {
+  if (destination === "home") {
+    closeTripDetail();
+    closeDrawer();
+    setMobileNavActive("home");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+
+  if (destination === "map") {
+    closeTripDetail();
+    closeDrawer();
+    setMobileNavActive("map");
+    $("map").scrollIntoView({ behavior: "smooth", block: "start" });
+    setTimeout(() => map?.invalidateSize(), 180);
+    return;
+  }
+
+  if (destination === "diary") {
+    setMobileNavActive("diary");
+    openLatestTripTab("diary");
+    return;
+  }
+
+  if (destination === "more") {
+    setMobileNavActive("more");
+    openActionSheet("moreMenuSheet");
+  }
+}
+
+function setMobileNavActive(destination) {
+  document.querySelectorAll("[data-mobile-nav]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.mobileNav === destination);
+  });
+}
+
+function openActionSheet(id) {
+  const sheet = $(id);
+  if (!sheet?.open) sheet?.showModal();
+}
+
+function closeActionSheets() {
+  ["quickActionSheet", "moreMenuSheet", "settingsSheet"].forEach((id) => {
+    const sheet = $(id);
+    if (sheet?.open) sheet.close();
+  });
+}
+
+function handleQuickAction(action) {
+  $("quickActionSheet").close();
+
+  if (action === "trip") {
+    openTripDialog();
+    return;
+  }
+
+  const recent = getRecentTrip();
+  if (action === "photo") {
+    if (!recent || state.schemaMode === "legacy") {
+      openTripDialog();
+      setTimeout(() => $("photoInput").focus(), 80);
+      if (state.schemaMode === "legacy") toast("舊版資料請用新旅程流程加入照片");
+      return;
+    }
+    openTripDialog(recent);
+    setTimeout(() => $("photoInput").focus(), 80);
+    return;
+  }
+
+  if (action === "diary") {
+    if (!recent) return openTripDialog();
+    if (state.schemaMode === "legacy") {
+      openLatestTripTab("diary");
+      toast("舊版日記目前可閱讀，編輯入口會在日記模組接入");
+      return;
+    }
+    openTripDialog(recent);
+    setTimeout(() => $("diaryInput").focus(), 80);
+  }
+}
+
+function handleMoreAction(action) {
+  $("moreMenuSheet").close();
+
+  if (action === "photos" || action === "timeline") {
+    setMobileNavActive("more");
+    openLatestTripTab("photos");
+    return;
+  }
+
+  if (action === "footprints") {
+    handleMobileNavigation("map");
+    return;
+  }
+
+  if (action === "settings") {
+    $("settingsEmail").textContent = state.user?.email || "登入帳號";
+    openActionSheet("settingsSheet");
+  }
+}
+
+function getRecentTrip() {
+  return [...state.trips].sort(compareTripsByDate)[0] || null;
+}
+
+function openLatestTripTab(tabName) {
+  const recent = getRecentTrip();
+  if (!recent) return toast("目前還沒有旅程");
+  closeActionSheets();
+  openTrip(recent.id);
+  setDetailTab(tabName);
 }
 
 async function loadTrips() {

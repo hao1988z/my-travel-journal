@@ -1334,6 +1334,126 @@ input:focus, textarea:focus, select:focus {
 .toast.show { visibility: visible; }
 .toast.show { transform: translate(-50%, 0); }
 
+.mobile-bottom-nav {
+  display: none;
+}
+
+.action-sheet {
+  width: min(500px, calc(100vw - 28px));
+  border: 0;
+  border-radius: 12px;
+  padding: 0;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.action-sheet::backdrop {
+  background: rgba(22, 18, 14, 0.46);
+}
+
+.sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 22px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sheet-head h2 {
+  margin: 0;
+  font-size: 25px;
+}
+
+.sheet-actions {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+}
+
+.sheet-actions button,
+.more-menu-list button {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 13px 14px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.sheet-actions button:hover,
+.sheet-actions button:focus-visible,
+.more-menu-list button:not(:disabled):hover,
+.more-menu-list button:not(:disabled):focus-visible {
+  border-color: var(--line);
+  background: var(--field);
+  outline: none;
+}
+
+.sheet-actions button > span:first-child {
+  width: 38px;
+  font-size: 24px;
+  text-align: center;
+}
+
+.sheet-actions button > span:last-child,
+.more-menu-list button {
+  display: grid;
+  gap: 2px;
+}
+
+.sheet-actions strong,
+.more-menu-list span {
+  font-weight: 700;
+}
+
+.sheet-actions small,
+.more-menu-list small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.more-menu-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 16px;
+}
+
+.more-menu-list button {
+  min-height: 64px;
+  align-content: center;
+  border-color: var(--line);
+}
+
+.more-menu-list button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.settings-summary {
+  display: grid;
+  gap: 6px;
+  padding: 20px 22px;
+}
+
+.settings-summary strong { font-size: 18px; }
+.settings-summary span { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.settings-summary p { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+
+.settings-signout {
+  width: calc(100% - 44px);
+  margin: 0 22px 22px;
+  border: 1px solid var(--line);
+  background: var(--field);
+  color: var(--danger);
+}
+
 @media (max-width: 860px) {
   .app-shell {
     height: auto;
@@ -1350,6 +1470,85 @@ input:focus, textarea:focus, select:focus {
     top: auto;
     height: 420px;
     min-height: 420px;
+  }
+
+  .app-shell,
+  .trip-detail-page {
+    padding-bottom: 78px;
+  }
+
+  .mobile-bottom-nav {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1100;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    align-items: center;
+    height: calc(68px + env(safe-area-inset-bottom));
+    padding: 6px 8px env(safe-area-inset-bottom);
+    border-top: 1px solid rgba(222, 219, 210, 0.9);
+    background: rgba(251, 250, 246, 0.96);
+    box-shadow: 0 -8px 24px rgba(55, 43, 31, 0.1);
+    backdrop-filter: blur(14px);
+  }
+
+  .mobile-nav-item,
+  .mobile-nav-add {
+    display: grid;
+    place-items: center;
+    gap: 2px;
+    height: 54px;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .mobile-nav-item.is-active { color: var(--accent); }
+
+  .mobile-nav-icon {
+    min-height: 24px;
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  .mobile-nav-add > span {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    margin-top: -19px;
+    border: 5px solid var(--paper);
+    border-radius: 50%;
+    background: var(--accent-2);
+    box-shadow: 0 8px 18px rgba(155, 92, 46, 0.32);
+    color: white;
+    font-size: 27px;
+    font-weight: 400;
+  }
+
+  .action-sheet {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    border-radius: 18px 18px 0 0;
+  }
+
+  .more-menu-list {
+    grid-template-columns: 1fr 1fr;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .more-menu-list button {
+    min-height: 60px;
   }
 
   .sidebar-head {

@@ -190,6 +190,28 @@
     </div>
   </section>
 
+  <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="主要導覽" hidden>
+    <button class="mobile-nav-item is-active" type="button" data-mobile-nav="home" aria-label="旅程">
+      <span class="mobile-nav-icon" aria-hidden="true">⌂</span>
+      <span>旅程</span>
+    </button>
+    <button class="mobile-nav-item" type="button" data-mobile-nav="map" aria-label="地圖">
+      <span class="mobile-nav-icon" aria-hidden="true">⌖</span>
+      <span>地圖</span>
+    </button>
+    <button class="mobile-nav-add" type="button" id="mobileAddBtn" aria-label="新增">
+      <span aria-hidden="true">＋</span>
+    </button>
+    <button class="mobile-nav-item" type="button" data-mobile-nav="diary" aria-label="日記">
+      <span class="mobile-nav-icon" aria-hidden="true">▤</span>
+      <span>日記</span>
+    </button>
+    <button class="mobile-nav-item" type="button" data-mobile-nav="more" aria-label="更多">
+      <span class="mobile-nav-icon" aria-hidden="true">•••</span>
+      <span>更多</span>
+    </button>
+  </nav>
+
   <dialog class="photo-viewer" id="photoViewer" aria-labelledby="photoViewerTitle">
     <div class="photo-viewer-head">
       <div>
@@ -295,6 +317,47 @@
         <button class="btn btn-primary" type="submit">儲存</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog class="action-sheet" id="quickActionSheet" aria-labelledby="quickActionTitle">
+    <div class="sheet-head">
+      <div><p class="detail-section-eyebrow">QUICK ACTION</p><h2 id="quickActionTitle">要新增什麼？</h2></div>
+      <button class="icon-btn" id="closeQuickActionBtn" type="button" aria-label="關閉">×</button>
+    </div>
+    <div class="sheet-actions">
+      <button type="button" data-quick-action="trip"><span aria-hidden="true">🧳</span><span><strong>新增旅程</strong><small>建立一段新的旅行紀錄</small></span></button>
+      <button type="button" data-quick-action="photo"><span aria-hidden="true">📷</span><span><strong>新增照片</strong><small>加入最近旅程的照片</small></span></button>
+      <button type="button" data-quick-action="diary"><span aria-hidden="true">📝</span><span><strong>寫旅行日記</strong><small>回到最近旅程記下心情</small></span></button>
+    </div>
+  </dialog>
+
+  <dialog class="action-sheet" id="moreMenuSheet" aria-labelledby="moreMenuTitle">
+    <div class="sheet-head">
+      <div><p class="detail-section-eyebrow">EXPLORE</p><h2 id="moreMenuTitle">更多</h2></div>
+      <button class="icon-btn" id="closeMoreMenuBtn" type="button" aria-label="關閉">×</button>
+    </div>
+    <div class="more-menu-list">
+      <button type="button" data-more-action="photos"><span>相簿</span><small>查看最近旅程的照片</small></button>
+      <button type="button" data-more-action="footprints"><span>我的足跡</span><small>在地圖查看所有旅程</small></button>
+      <button type="button" disabled><span>月曆</span><small>下一階段接入</small></button>
+      <button type="button" data-more-action="timeline"><span>時間軸</span><small>查看最近旅程的照片時間軸</small></button>
+      <button type="button" disabled><span>統計</span><small>下一階段接入</small></button>
+      <button type="button" disabled><span>資料管理</span><small>備份功能接入後會放在這裡</small></button>
+      <button type="button" data-more-action="settings"><span>設定</span><small>私人雲端與帳號設定</small></button>
+    </div>
+  </dialog>
+
+  <dialog class="action-sheet settings-sheet" id="settingsSheet" aria-labelledby="settingsTitle">
+    <div class="sheet-head">
+      <div><p class="detail-section-eyebrow">SETTINGS</p><h2 id="settingsTitle">設定</h2></div>
+      <button class="icon-btn" id="closeSettingsBtn" type="button" aria-label="關閉">×</button>
+    </div>
+    <div class="settings-summary">
+      <strong>私人雲端</strong>
+      <span id="settingsEmail">登入帳號</span>
+      <p>旅程預設為私人，只有開啟分享後才會產生分享連結。</p>
+    </div>
+    <button class="btn btn-ghost settings-signout" id="mobileSignOutBtn" type="button">登出</button>
   </dialog>
 
   <div class="toast" id="toast"></div>
