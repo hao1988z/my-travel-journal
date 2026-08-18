@@ -20,7 +20,8 @@ const state = {
   schemaMode: "modern",
   storageBucket: bucket,
   viewerPhotos: [],
-  viewerIndex: 0
+  viewerIndex: 0,
+  locationResults: []
 };
 
 const $ = (id) => document.getElementById(id);
@@ -99,6 +100,12 @@ function bindEvents() {
   $("tripForm").addEventListener("submit", saveTrip);
   $("deleteTripBtn").addEventListener("click", deleteCurrentTrip);
   $("photoInput").addEventListener("change", handlePhotoInput);
+  $("searchLocationBtn").addEventListener("click", searchLocation);
+  $("locationInput").addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    searchLocation();
+  });
   $("searchInput").addEventListener("input", renderTrips);
 }
 
@@ -760,7 +767,9 @@ function closeTripDialog() {
 function openTripDialog(trip = null) {
   state.editingTrip = trip;
   state.selectedPhoto = null;
+  state.locationResults = [];
   clearPhotoPreview();
+  clearLocationResults();
   $("dialogTitle").textContent = trip ? "編輯旅途" : "新增旅途";
   $("deleteTripBtn").hidden = !trip;
   $("tripForm").reset();
@@ -789,6 +798,83 @@ function openTripDialog(trip = null) {
   }
 
   $("tripDialog").showModal();
+}
+
+async function searchLocation() {
+  const query = $("locationInput").value.trim();
+  if (!query) return toast("請先輸入地點名稱");
+
+  const button = $("searchLocationBtn");
+  button.disabled = true;
+  button.textContent = "搜尋中…";
+  $("locationSearchStatus").textContent = "正在尋找地標…";
+  clearLocationResults();
+
+  try {
+    const params = new URLSearchParams({
+      q: query,
+      format: "jsonv2",
+      addressdetails: "1",
+      limit: "5",
+      "accept-language": "zh-TW,zh,en"
+    });
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`);
+    if (!response.ok) throw new Error(`地標搜尋失敗：HTTP ${response.status}`);
+    const results = await response.json();
+    state.locationResults = Array.isArray(results) ? results.filter((result) => result.lat && result.lon) : [];
+    renderLocationResults(query);
+  } catch (error) {
+    console.error("[searchLocation]", error);
+    $("locationSearchStatus").textContent = "地標搜尋失敗，請稍後再試或手動輸入座標。";
+  } finally {
+    button.disabled = false;
+    button.textContent = "搜尋地標";
+  }
+}
+
+function renderLocationResults(query) {
+  const results = $("locationResults");
+  if (!state.locationResults.length) {
+    $("locationSearchStatus").textContent = `找不到「${query}」的地標，請換個關鍵字。`;
+    results.hidden = true;
+    return;
+  }
+
+  $("locationSearchStatus").textContent = "請選擇正確的地標：";
+  results.innerHTML = state.locationResults.map((result, index) => `
+    <button class="location-result" type="button" role="option" data-location-index="${index}">
+      <strong>${escapeHtml(result.name || result.display_name?.split(",")[0] || query)}</strong>
+      <span>${escapeHtml(result.display_name || "")}</span>
+    </button>
+  `).join("");
+  results.hidden = false;
+  results.querySelectorAll("[data-location-index]").forEach((button) => {
+    button.addEventListener("click", () => selectLocationResult(Number(button.dataset.locationIndex)));
+  });
+}
+
+function selectLocationResult(index) {
+  const result = state.locationResults[index];
+  if (!result) return;
+  const name = result.name || result.display_name?.split(",")[0] || $("locationInput").value.trim();
+  $("locationInput").value = name;
+  $("latInput").value = Number(result.lat).toFixed(6);
+  $("lngInput").value = Number(result.lon).toFixed(6);
+  $("locationSearchStatus").textContent = `已選擇：${result.display_name || name}`;
+  $("locationResults").hidden = true;
+
+  const lat = numberOrNull(result.lat);
+  const lng = numberOrNull(result.lon);
+  if (map && lat !== null && lng !== null) map.setView([lat, lng], 13);
+}
+
+function clearLocationResults() {
+  const results = $("locationResults");
+  const status = $("locationSearchStatus");
+  if (!results || !status) return;
+  results.innerHTML = "";
+  results.hidden = true;
+  status.textContent = "";
 }
 
 function clearPhotoPreview() {

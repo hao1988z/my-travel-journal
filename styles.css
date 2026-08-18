@@ -793,6 +793,48 @@ input:focus, textarea:focus, select:focus {
 
 .trip-form { padding: 20px; }
 
+.location-input-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.location-input-row input { min-width: 0; flex: 1; }
+.location-input-row .btn { flex: 0 0 auto; white-space: nowrap; }
+.location-search-status { min-height: 18px; margin: 7px 0 0; color: var(--muted); font-size: 12px; }
+.location-search-source { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+
+.location-results {
+  display: grid;
+  gap: 6px;
+  max-height: 230px;
+  overflow: auto;
+  margin-top: 4px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.location-result {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.location-result:hover,
+.location-result:focus-visible { background: var(--field); outline: 0; }
+.location-result strong { font-size: 13px; }
+.location-result span { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+
 .dialog-head {
   display: flex;
   justify-content: space-between;
@@ -901,6 +943,9 @@ input:focus, textarea:focus, select:focus {
   .form-grid {
     grid-template-columns: 1fr;
   }
+
+  .location-input-row { align-items: stretch; }
+  .location-input-row .btn { padding-inline: 11px; font-size: 12px; }
 
   .topbar {
     padding: 0 12px;
