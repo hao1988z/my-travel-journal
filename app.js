@@ -402,6 +402,9 @@ async function loadTrips() {
     state.storageBucket = bucket;
     state.trips = modernResult.data || [];
     state.diaries = [];
+    // Keep the original standalone diary records visible after the UI refactor.
+    // The modern trips query does not include the separate diaries table.
+    await loadStandaloneDiaries();
   } else {
     // The original app stores photos_meta on trips and diary entries separately.
     // Keep that data readable while the database remains unchanged.
@@ -464,6 +467,10 @@ async function loadStandaloneDiaries() {
     .eq("user_id", state.user.id)
     .order("diary_date", { ascending: false });
   if (error) {
+    if (error.code === "PGRST205" || error.code === "42P01") {
+      state.diaries = [];
+      return;
+    }
     console.error("[loadStandaloneDiaries]", error);
     state.diaries = [];
     return;
