@@ -21,7 +21,10 @@ const state = {
   storageBucket: bucket,
   viewerPhotos: [],
   viewerIndex: 0,
-  locationResults: []
+  locationResults: [],
+  stopLocationResults: [],
+  stopSchemaAvailable: false,
+  selectedStopId: null
 };
 
 const $ = (id) => document.getElementById(id);
@@ -29,6 +32,8 @@ const $ = (id) => document.getElementById(id);
 let map;
 let detailMap;
 let detailMarker;
+let detailStopMarkers = [];
+let detailRouteLine;
 
 boot();
 
@@ -97,6 +102,12 @@ function bindEvents() {
   document.querySelectorAll("[data-detail-tab]").forEach((button) => {
     button.addEventListener("click", () => setDetailTab(button.dataset.detailTab));
   });
+  $("detailAddStopBtn").addEventListener("click", openStopDialog);
+  $("closeStopDialogBtn").addEventListener("click", closeStopDialog);
+  $("cancelStopDialogBtn").addEventListener("click", closeStopDialog);
+  $("stopForm").addEventListener("submit", saveStop);
+  $("searchStopLocationBtn").addEventListener("click", searchStopLocation);
+  $("pickStopOnMapBtn").addEventListener("click", pickStopOnMap);
   $("tripForm").addEventListener("submit", saveTrip);
   $("deleteTripBtn").addEventListener("click", deleteCurrentTrip);
   $("photoInput").addEventListener("change", handlePhotoInput);
@@ -405,9 +416,45 @@ async function loadTrips() {
     await loadStandaloneDiaries();
   }
 
+  await loadTripStops();
   await hydratePhotoUrls();
   renderTrips();
   refreshMarkers();
+}
+
+async function loadTripStops() {
+  state.stopSchemaAvailable = false;
+  state.trips.forEach((trip) => { trip.trip_days = []; });
+  if (state.schemaMode !== "modern" || !state.trips.length) return;
+
+  const { data, error } = await client
+    .from("trip_days")
+    .select("*, trip_stops(*)")
+    .in("trip_id", state.trips.map((trip) => trip.id))
+    .order("day_number", { ascending: true })
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    if (error.code === "PGRST205" || error.code === "42P01") return;
+    console.error("[loadTripStops]", error);
+    return;
+  }
+
+  state.stopSchemaAvailable = true;
+  state.trips.forEach((trip) => {
+    trip.trip_days = (data || [])
+      .filter((day) => String(day.trip_id) === String(trip.id))
+      .map((day) => ({
+        ...day,
+        trip_stops: [...(day.trip_stops || [])].sort(compareStops)
+      }));
+  });
+}
+
+function compareStops(a, b) {
+  const orderDifference = (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
+  if (orderDifference) return orderDifference;
+  return String(a.arrival_time || "99:99").localeCompare(String(b.arrival_time || "99:99"));
 }
 
 async function loadStandaloneDiaries() {
@@ -758,6 +805,7 @@ function setDetailTab(tabName) {
 }
 
 function renderTripDetail(trip) {
+  state.selectedStopId = null;
   const photos = getTripPhotos(trip);
   const diaries = getTripDiaryRecords(trip);
   const cover = getCoverUrl(trip);
@@ -782,8 +830,10 @@ function renderTripDetail(trip) {
   $("detailPhotoCount").textContent = photos.length;
   $("detailDiaryCount").textContent = diaries.length;
   const locations = getTripLocations(trip);
-  $("detailPlaceCount").textContent = locations[0] === "未記錄地點" ? "0" : locations.length;
-  $("detailRoute").innerHTML = locations.map((place, index) => `
+  const stops = getTripStops(trip);
+  const routeLocations = stops.length ? stops.map((stop) => stop.name) : locations;
+  $("detailPlaceCount").textContent = stops.length || (locations[0] === "未記錄地點" ? "0" : locations.length);
+  $("detailRoute").innerHTML = routeLocations.map((place, index) => `
     ${index ? '<span class="detail-route-arrow" aria-hidden="true">→</span>' : ""}
     <span class="detail-route-stop">${escapeHtml(place)}</span>
   `).join("");
@@ -804,8 +854,9 @@ function renderTripDetail(trip) {
   const recent = photos.slice(0, 6);
   const recentMarkup = renderDetailPhotoGrid(recent, "目前沒有照片");
   $("detailRecentPhotos").innerHTML = recentMarkup;
+  renderTripItinerary(trip);
   $("detailAllPhotos").innerHTML = renderTravelTimeline(trip, photos);
-  const hasPhotoTimes = photos.some((photo) => getPhotoTakenAt(photo));
+  const hasPhotoTimes = photos.some((photo) => getPhotoTakenAt(photo) || photo.trip_stop_id);
   $("detailPhotosSummary").textContent = `${photos.length} 張照片${cover ? " · 已設定封面" : ""}${hasPhotoTimes ? " · 依照片時間分組" : " · 目前依旅程日期排列"}`;
   renderDetailExpenses(trip);
   $("detailOverviewExpenses").innerHTML = $("detailExpenses").innerHTML;
@@ -828,6 +879,119 @@ function getTripLocations(trip) {
   const raw = String(trip?.location_name || trip?.location || "").trim();
   if (!raw) return ["未記錄地點"];
   return raw.split(/\s*(?:\/|→)\s*/).map((place) => place.trim()).filter(Boolean);
+}
+
+function getTripDays(trip) {
+  return Array.isArray(trip?.trip_days) ? [...trip.trip_days].sort((a, b) => {
+    const dayDifference = (Number(a.day_number) || 0) - (Number(b.day_number) || 0);
+    return dayDifference || (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
+  }) : [];
+}
+
+function getTripStops(trip) {
+  return getTripDays(trip).flatMap((day) => (day.trip_stops || []).map((stop) => ({ ...stop, day })));
+}
+
+function renderTripItinerary(trip) {
+  const days = getTripDays(trip);
+  const photos = getTripPhotos(trip);
+  const addButton = $("detailAddStopBtn");
+  addButton.disabled = !state.stopSchemaAvailable;
+  addButton.title = state.stopSchemaAvailable ? "新增一天中的地標" : "請先執行 trip_days_stops migration";
+
+  if (!state.stopSchemaAvailable) {
+    $("detailItinerarySummary").textContent = "目前仍使用原本的旅程地點資料";
+    $("detailItineraryList").innerHTML = [
+      "<div class=\"itinerary-empty\"><strong>多地標功能尚未啟用</strong>",
+      "<p>現有旅程不會受到影響。執行專案內的 migration 後，就能建立 Day、地標、抵達時間與每日路線。</p></div>"
+    ].join("");
+    return;
+  }
+
+  const stopCount = days.reduce((sum, day) => sum + (day.trip_stops || []).length, 0);
+  $("detailItinerarySummary").textContent = days.length + " 天 · " + stopCount + " 個地標";
+  if (!days.length) {
+    $("detailItineraryList").innerHTML = "<div class=\"itinerary-empty\"><strong>還沒有每日地標</strong><p>按「新增地標」開始建立這趟旅程的 Day 1。</p></div>";
+    return;
+  }
+
+  $("detailItineraryList").innerHTML = days.map((day) => {
+    const stops = [...(day.trip_stops || [])].sort(compareStops);
+    const dayPhotos = photos.filter((photo) => stops.some((stop) => String(stop.id) === String(photo.trip_stop_id))).length;
+    return [
+      "<section class=\"itinerary-day\" data-day-id=\"", escapeHtml(day.id), "\">",
+      "<header class=\"itinerary-day-head\"><div><p class=\"travel-day-label\">DAY ",
+      escapeHtml(day.day_number), "</p><h3>", escapeHtml(day.title || formatItineraryDate(day.date) || "未命名的一天"),
+      "</h3></div><span>", stops.length, " 個地標", dayPhotos ? " · " + dayPhotos + " 張照片" : "", "</span></header>",
+      "<div class=\"itinerary-stop-list\">",
+      stops.length ? stops.map((stop, index) => renderItineraryStop(stop, index, photos)).join("") : "<div class=\"itinerary-day-empty\">這天還沒有地標。</div>",
+      "</div></section>"
+    ].join("");
+  }).join("");
+  bindItineraryInteractions();
+}
+
+function renderItineraryStop(stop, index, photos) {
+  const stopPhotos = photos.filter((photo) => String(photo.trip_stop_id) === String(stop.id)).length;
+  const time = [stop.arrival_time, stop.departure_time].filter(Boolean).join(" — ");
+  const meta = [stop.category, time].filter(Boolean).join(" · ");
+  return [
+    "<article class=\"itinerary-stop\" draggable=\"true\" data-stop-id=\"", escapeHtml(stop.id),
+    "\" data-day-id=\"", escapeHtml(stop.day_id), "\">",
+    "<span class=\"itinerary-stop-handle\" aria-hidden=\"true\">☰</span><span class=\"itinerary-stop-order\">",
+    index + 1, "</span><div class=\"itinerary-stop-body\"><div class=\"itinerary-stop-title\"><strong>",
+    escapeHtml(stop.name), "</strong><time>", escapeHtml(stop.arrival_time || ""),
+    "</time></div><p>", escapeHtml(meta || stop.address || "尚未記錄抵達時間"), "</p>",
+    stop.note ? "<small>" + escapeHtml(stop.note) + "</small>" : "",
+    stopPhotos ? "<span class=\"itinerary-stop-photos\">📷 " + stopPhotos + " 張照片</span>" : "",
+    "</div><button class=\"text-action itinerary-stop-map\" type=\"button\" data-stop-map=\"",
+    escapeHtml(stop.id), "\">地圖 →</button></article>"
+  ].join("");
+}
+
+function formatItineraryDate(value) {
+  if (!value) return "";
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? match[1] + "." + match[2] + "." + match[3] : String(value);
+}
+
+function bindItineraryInteractions() {
+  const container = $("detailItineraryList");
+  let dragged = null;
+  container.querySelectorAll(".itinerary-stop").forEach((row) => {
+    row.addEventListener("dragstart", () => {
+      dragged = row;
+      row.classList.add("is-dragging");
+    });
+    row.addEventListener("dragend", () => {
+      row.classList.remove("is-dragging");
+      dragged = null;
+    });
+    row.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      if (!dragged || dragged === row || dragged.dataset.dayId !== row.dataset.dayId) return;
+      const rect = row.getBoundingClientRect();
+      row.parentElement.insertBefore(dragged, event.clientY < rect.top + rect.height / 2 ? row : row.nextSibling);
+    });
+    row.querySelector("[data-stop-map]")?.addEventListener("click", () => {
+      state.selectedStopId = row.dataset.stopId;
+      setDetailTab("map");
+    });
+  });
+  container.querySelectorAll(".itinerary-stop-list").forEach((list) => {
+    list.addEventListener("drop", () => persistStopOrder(list));
+  });
+}
+
+async function persistStopOrder(list) {
+  if (!state.stopSchemaAvailable) return;
+  const rows = [...list.querySelectorAll(".itinerary-stop")];
+  const results = await Promise.all(rows.map((row, index) =>
+    client.from("trip_stops").update({ sort_order: index }).eq("id", row.dataset.stopId)
+  ));
+  const failed = results.find((result) => result.error);
+  if (failed) return toast(failed.error.message || "地標排序儲存失敗");
+  toast("地標順序已儲存");
 }
 
 function renderDiaryPreview(diaries) {
@@ -939,15 +1103,19 @@ function renderTimelinePhotoTile(item) {
 }
 
 function getPhotoTimelineItem(trip, photo, index) {
+  const linkedStop = getTripStops(trip).find((stop) => String(stop.id) === String(photo?.trip_stop_id));
   const takenAt = getPhotoTakenAt(photo);
   const tripStart = parseTimelineDate(trip?.travel_date || trip?.date_start);
-  const date = takenAt?.date || tripStart?.date || null;
+  const stopDate = linkedStop?.day?.date ? parseTimelineDate(linkedStop.day.date)?.date : null;
+  const date = takenAt?.date || stopDate || tripStart?.date || null;
   const dayKey = date ? toTimelineDateKey(date) : "unknown";
   const dayNumber = tripStart?.date && date
     ? Math.max(1, Math.round((date - tripStart.date) / 86400000) + 1)
     : 1;
-  const location = getPhotoTimelineLocation(trip, photo);
-  const timeLabel = takenAt?.hasTime ? formatTimelineTime(takenAt.date) : "未記錄時間";
+  const location = linkedStop?.name || getPhotoTimelineLocation(trip, photo);
+  const timeLabel = takenAt?.hasTime
+    ? formatTimelineTime(takenAt.date)
+    : linkedStop?.arrival_time || "未記錄時間";
   return {
     photo,
     index,
@@ -1119,14 +1287,69 @@ function renderDetailMap(trip) {
     }).addTo(detailMap);
   }
   if (detailMarker) detailMarker.remove();
+  detailStopMarkers.forEach((marker) => marker.remove());
+  detailStopMarkers = [];
+  if (detailRouteLine) {
+    detailRouteLine.remove();
+    detailRouteLine = null;
+  }
+
+  const stops = getTripStops(trip)
+    .map((stop, index) => ({
+      ...stop,
+      index,
+      lat: numberOrNull(stop.lat),
+      lng: numberOrNull(stop.lng)
+    }))
+    .filter((stop) => stop.lat !== null && stop.lng !== null);
+
+  if (stops.length) {
+    const points = stops.map((stop) => [stop.lat, stop.lng]);
+    detailRouteLine = L.polyline(points, {
+      color: "#9b5c2e",
+      weight: 3,
+      opacity: 0.72,
+      dashArray: "7 8"
+    }).addTo(detailMap);
+    stops.forEach((stop) => {
+      const marker = L.marker([stop.lat, stop.lng], {
+        icon: makeStopMarkerIcon(stop.index + 1)
+      }).addTo(detailMap);
+      marker.bindPopup("<strong>" + escapeHtml(stop.name) + "</strong><br>" + escapeHtml(stop.arrival_time || "時間未記錄"));
+      detailStopMarkers.push(marker);
+    });
+    const selected = stops.find((stop) => String(stop.id) === String(state.selectedStopId));
+    if (selected) {
+      detailMap.setView([selected.lat, selected.lng], 15);
+      const selectedMarker = detailStopMarkers[stops.indexOf(selected)];
+      selectedMarker?.openPopup();
+    } else {
+      detailMap.fitBounds(points, { padding: [36, 36], maxZoom: 14 });
+    }
+    $("detailMapSummary").textContent = "已記錄 " + stops.length + " 個地標 · 路線依排序連線";
+    setTimeout(() => detailMap.invalidateSize(), 80);
+    return;
+  }
+
   if (lat === null || lng === null) {
     detailMap.setView([23.6, 121], 7);
-    $("detailMapSummary").textContent = "這趟旅程尚未記錄座標";
+    $("detailMapSummary").textContent = getTripStops(trip).length
+      ? "地標尚未記錄座標"
+      : "這趟旅程尚未記錄座標";
   } else {
     detailMap.setView([lat, lng], 13);
     detailMarker = L.marker([lat, lng], { icon: makeMarkerIcon(trip) }).addTo(detailMap);
   }
   setTimeout(() => detailMap.invalidateSize(), 80);
+}
+
+function makeStopMarkerIcon(order) {
+  return L.divIcon({
+    className: "stop-marker-wrap",
+    html: "<span class=\"stop-marker\">" + escapeHtml(order) + "</span>",
+    iconSize: [34, 34],
+    iconAnchor: [17, 17]
+  });
 }
 
 function renderDetailExpenses(trip) {
@@ -1265,6 +1488,220 @@ function openTripDialog(trip = null) {
   }
 
   $("tripDialog").showModal();
+}
+
+async function openStopDialog() {
+  const trip = state.editingTrip;
+  if (!trip) return;
+  if (!state.stopSchemaAvailable) return toast("請先執行 trip_days_stops migration");
+
+  try {
+    await ensureTripDays(trip);
+    populateStopDayOptions(trip);
+    resetStopForm();
+    $("stopDialog").showModal();
+  } catch (error) {
+    console.error("[openStopDialog]", error);
+    toast(error.message || "每日行程初始化失敗");
+  }
+}
+
+async function ensureTripDays(trip) {
+  if (getTripDays(trip).length) return;
+  const start = trip.travel_date || trip.date_start || "";
+  const end = trip.travel_date_end || trip.date_end || start;
+  const startDate = parseTimelineDate(start)?.date || null;
+  const endDate = parseTimelineDate(end)?.date || startDate;
+  const dayCount = startDate && endDate
+    ? Math.max(1, Math.round((endDate - startDate) / 86400000) + 1)
+    : 1;
+  const locations = getTripLocations(trip);
+  const rows = Array.from({ length: dayCount }, (_, index) => {
+    const date = startDate ? new Date(startDate.getTime() + index * 86400000) : null;
+    return {
+      trip_id: trip.id,
+      day_number: index + 1,
+      date: date ? toTimelineDateKey(date) : null,
+      title: locations[index] || null,
+      sort_order: index
+    };
+  });
+  const { error } = await client.from("trip_days").insert(rows);
+  if (error) throw error;
+  await loadTripStops();
+}
+
+function populateStopDayOptions(trip) {
+  $("stopDayInput").innerHTML = getTripDays(trip).map((day) => {
+    const label = "Day " + day.day_number + (day.title ? " · " + day.title : "");
+    return "<option value=\"" + escapeHtml(day.id) + "\">" + escapeHtml(label) + "</option>";
+  }).join("");
+}
+
+function resetStopForm() {
+  $("stopForm").reset();
+  $("stopFormStatus").textContent = "";
+  $("stopLocationStatus").textContent = "";
+  $("stopLocationResults").innerHTML = "";
+  $("stopLocationResults").hidden = true;
+  state.stopLocationResults = [];
+}
+
+function closeStopDialog(reset = true) {
+  const dialog = $("stopDialog");
+  if (dialog?.open) dialog.close();
+  if (reset) resetStopForm();
+}
+
+async function saveStop(event) {
+  event.preventDefault();
+  const trip = state.editingTrip;
+  if (!trip || !state.stopSchemaAvailable) return;
+  const dayId = $("stopDayInput").value;
+  const day = getTripDays(trip).find((item) => String(item.id) === String(dayId));
+  const name = $("stopNameInput").value.trim();
+  if (!day || !name) return toast("請選擇 Day 並輸入地標名稱");
+
+  const payload = {
+    day_id: day.id,
+    name,
+    address: $("stopAddressInput").value.trim() || null,
+    lat: numberOrNull($("stopLatInput").value),
+    lng: numberOrNull($("stopLngInput").value),
+    arrival_time: $("stopArrivalInput").value || null,
+    departure_time: $("stopDepartureInput").value || null,
+    category: $("stopCategoryInput").value || null,
+    mood: $("stopMoodInput").value || null,
+    note: $("stopNoteInput").value.trim() || null,
+    sort_order: (day.trip_stops || []).length
+  };
+  if ((payload.lat === null) !== (payload.lng === null)) return toast("緯度與經度請一起填寫");
+
+  const { data: savedStop, error } = await client.from("trip_stops").insert(payload).select("id").single();
+  if (error) {
+    console.error("[saveStop]", error);
+    return toast(error.message || "地標儲存失敗");
+  }
+
+  const files = [...$("stopPhotoInput").files];
+  if (files.length && savedStop?.id) {
+    try {
+      await uploadStopPhotos(trip.id, savedStop.id, files);
+    } catch (uploadError) {
+      console.error("[saveStop.photos]", uploadError);
+      toast("地標已加入，但照片上傳失敗：" + uploadError.message);
+    }
+  }
+
+  await loadTripStops();
+  await hydratePhotoUrls();
+  renderTripDetail(trip);
+  setDetailTab("itinerary");
+  toast("已加入 " + name);
+  const selectedDay = $("stopDayInput").value;
+  resetStopForm();
+  $("stopDayInput").value = selectedDay;
+  $("stopFormStatus").textContent = "✓ 已加入 " + name + "，可以繼續新增地標";
+}
+
+async function uploadStopPhotos(tripId, stopId, files) {
+  const uploaded = [];
+  try {
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) throw new Error("只能上傳圖片檔");
+      const result = await uploadPhoto(tripId, file);
+      if (result.error) {
+        await rollbackUploadedPhoto(result.record);
+        throw result.error;
+      }
+      const { error } = await client.from("trip_photos").update({ trip_stop_id: stopId }).eq("id", result.record.id);
+      if (error) {
+        await rollbackUploadedPhoto(result.record);
+        throw error;
+      }
+      uploaded.push(result.record);
+    }
+  } catch (error) {
+    await Promise.all(uploaded.map((record) => rollbackUploadedPhoto(record)));
+    throw error;
+  }
+}
+
+async function searchStopLocation() {
+  const query = [$("stopNameInput").value.trim(), $("stopAddressInput").value.trim()].filter(Boolean).join(", ");
+  if (!query) return toast("請先輸入地標名稱");
+  const button = $("searchStopLocationBtn");
+  button.disabled = true;
+  button.textContent = "搜尋中…";
+  $("stopLocationStatus").textContent = "正在尋找地標…";
+  try {
+    const params = new URLSearchParams({
+      q: query,
+      format: "jsonv2",
+      addressdetails: "1",
+      limit: "5",
+      "accept-language": "zh-TW,zh,en"
+    });
+    const response = await fetch("https://nominatim.openstreetmap.org/search?" + params);
+    if (!response.ok) throw new Error("地標搜尋失敗：HTTP " + response.status);
+    const results = await response.json();
+    state.stopLocationResults = Array.isArray(results) ? results.filter((result) => result.lat && result.lon) : [];
+    renderStopLocationResults(query);
+  } catch (error) {
+    console.error("[searchStopLocation]", error);
+    $("stopLocationStatus").textContent = "搜尋失敗，請手動輸入地址或座標。";
+  } finally {
+    button.disabled = false;
+    button.textContent = "搜尋地點";
+  }
+}
+
+function renderStopLocationResults(query) {
+  const results = $("stopLocationResults");
+  if (!state.stopLocationResults.length) {
+    $("stopLocationStatus").textContent = "找不到「" + query + "」，請換個關鍵字。";
+    results.hidden = true;
+    return;
+  }
+  $("stopLocationStatus").textContent = "請選擇正確的地標：";
+  results.innerHTML = state.stopLocationResults.map((result, index) => [
+    "<button class=\"location-result\" type=\"button\" role=\"option\" data-stop-location-index=\"", index, "\">",
+    "<strong>", escapeHtml(result.name || result.display_name?.split(",")[0] || query), "</strong>",
+    "<span>", escapeHtml(result.display_name || ""), "</span></button>"
+  ].join("")).join("");
+  results.hidden = false;
+  results.querySelectorAll("[data-stop-location-index]").forEach((button) => {
+    button.addEventListener("click", () => selectStopLocation(Number(button.dataset.stopLocationIndex)));
+  });
+}
+
+function selectStopLocation(index) {
+  const result = state.stopLocationResults[index];
+  if (!result) return;
+  const name = result.name || result.display_name?.split(",")[0] || $("stopNameInput").value.trim();
+  $("stopNameInput").value = name;
+  $("stopAddressInput").value = result.display_name || "";
+  $("stopLatInput").value = Number(result.lat).toFixed(6);
+  $("stopLngInput").value = Number(result.lon).toFixed(6);
+  $("stopLocationStatus").textContent = "已選擇：" + (result.display_name || name);
+  $("stopLocationResults").hidden = true;
+}
+
+function pickStopOnMap() {
+  if (!state.editingTrip) return;
+  closeStopDialog(false);
+  setDetailTab("map");
+  toast("請在地圖上點選地標位置");
+  setTimeout(() => {
+    if (!detailMap) return;
+    detailMap.once("click", (event) => {
+      $("stopLatInput").value = event.latlng.lat.toFixed(6);
+      $("stopLngInput").value = event.latlng.lng.toFixed(6);
+      $("stopLocationStatus").textContent = "已從地圖取得座標，可繼續填寫地標資料";
+      setDetailTab("itinerary");
+      $("stopDialog").showModal();
+    });
+  }, 100);
 }
 
 async function searchLocation() {

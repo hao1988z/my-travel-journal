@@ -815,6 +815,107 @@ input:focus, textarea:focus, select:focus {
   font-size: 13px;
 }
 
+.detail-panel-heading-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.itinerary-list {
+  display: grid;
+  gap: 20px;
+}
+
+.itinerary-day {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.itinerary-day-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  background: #f7eddc;
+}
+
+.itinerary-day-head .travel-day-label { margin-bottom: 4px; }
+.itinerary-day-head h3 { margin: 0; font-size: 22px; }
+.itinerary-day-head > span { color: var(--muted); font-size: 12px; }
+
+.itinerary-stop-list {
+  display: grid;
+}
+
+.itinerary-stop {
+  display: grid;
+  grid-template-columns: 22px 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 82px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  transition: background .15s ease, opacity .15s ease;
+}
+
+.itinerary-stop:hover { background: #fcfbf8; }
+.itinerary-stop.is-dragging { opacity: .45; }
+.itinerary-stop-handle { color: var(--muted); cursor: grab; font-size: 15px; }
+.itinerary-stop-order {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--accent-2);
+  border-radius: 50%;
+  color: var(--accent-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.itinerary-stop-body { min-width: 0; }
+.itinerary-stop-title { display: flex; align-items: baseline; gap: 12px; }
+.itinerary-stop-title strong { font: 700 16px "Noto Serif TC", serif; overflow-wrap: anywhere; }
+.itinerary-stop-title time { color: var(--accent-2); font-size: 12px; font-weight: 700; }
+.itinerary-stop-body p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.itinerary-stop-body small { display: block; margin-top: 5px; color: #46464b; font-size: 12px; white-space: pre-wrap; }
+.itinerary-stop-photos { display: inline-block; margin-top: 5px; color: var(--accent); font-size: 11px; font-weight: 700; }
+.itinerary-stop-map { white-space: nowrap; }
+.itinerary-day-empty { padding: 20px; color: var(--muted); font-size: 13px; }
+
+.itinerary-empty {
+  padding: 30px 22px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: rgba(255,255,255,.5);
+  text-align: center;
+}
+
+.itinerary-empty strong { display: block; font: 700 19px "Noto Serif TC", serif; }
+.itinerary-empty p { max-width: 560px; margin: 8px auto 0; color: var(--muted); font-size: 13px; line-height: 1.8; }
+
+.stop-form-status { min-height: 18px; margin: 0; color: var(--accent); font-size: 12px; }
+
+.stop-marker-wrap { background: transparent; border: 0; }
+.stop-marker {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 3px solid white;
+  border-radius: 50%;
+  background: var(--accent-2);
+  box-shadow: 0 3px 12px rgba(55, 43, 31, .35);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .detail-stat-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1683,6 +1784,15 @@ input:focus, textarea:focus, select:focus {
     padding-top: 22px;
   }
 
+  .detail-panel-heading-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .detail-panel-heading-row .btn {
+    width: 100%;
+  }
+
   .detail-stat-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1732,6 +1842,42 @@ input:focus, textarea:focus, select:focus {
   .travel-event-head time {
     flex-basis: 52px;
     font-size: 11px;
+  }
+
+  .itinerary-day-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .itinerary-stop {
+    grid-template-columns: 18px 26px minmax(0, 1fr);
+    gap: 8px;
+    padding: 13px 12px;
+  }
+
+  .itinerary-stop-map {
+    grid-column: 3;
+    justify-self: start;
+    margin-top: 2px;
+  }
+
+  .itinerary-stop-title {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .stop-dialog .location-input-row {
+    flex-wrap: wrap;
+  }
+
+  .stop-dialog .location-input-row input {
+    flex: 1 1 100%;
+  }
+
+  .stop-dialog .location-input-row .btn {
+    flex: 1 1 0;
   }
 
   .detail-photo-tile figcaption {

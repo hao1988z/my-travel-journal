@@ -119,6 +119,7 @@
 
       <nav class="detail-tabs" aria-label="旅途內容">
         <button class="detail-tab active" type="button" data-detail-tab="overview">總覽</button>
+        <button class="detail-tab" type="button" data-detail-tab="itinerary">行程</button>
         <button class="detail-tab" type="button" data-detail-tab="photos">照片</button>
         <button class="detail-tab" type="button" data-detail-tab="diary">日記</button>
         <button class="detail-tab" type="button" data-detail-tab="map">地圖</button>
@@ -166,6 +167,14 @@
           </div>
           <div class="detail-expense-summary" id="detailOverviewExpenses"></div>
         </article>
+      </div>
+
+      <div class="detail-panel" id="detail-panel-itinerary" hidden>
+        <div class="detail-panel-heading detail-panel-heading-row">
+          <div><p class="detail-section-eyebrow">DAY BY DAY</p><h2>每日行程與地標</h2><p id="detailItinerarySummary"></p></div>
+          <button class="btn btn-primary" id="detailAddStopBtn" type="button">＋ 新增地標</button>
+        </div>
+        <div class="itinerary-list" id="detailItineraryList"></div>
       </div>
 
       <div class="detail-panel" id="detail-panel-photos" hidden>
@@ -315,6 +324,66 @@
       <div class="dialog-actions">
         <button class="btn btn-soft" type="button" id="deleteTripBtn" hidden>刪除</button>
         <button class="btn btn-primary" type="submit">儲存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="trip-dialog stop-dialog" id="stopDialog">
+    <form class="trip-form" id="stopForm">
+      <div class="dialog-head">
+        <div><p class="detail-section-eyebrow">ADD STOP</p><h3>新增地標</h3></div>
+        <button class="icon-btn" type="button" id="closeStopDialogBtn" aria-label="關閉">×</button>
+      </div>
+
+      <label>
+        所屬 Day
+        <select id="stopDayInput" required></select>
+      </label>
+
+      <label>
+        地標名稱
+        <div class="location-input-row">
+          <input type="text" id="stopNameInput" placeholder="平江路歷史街區" required autocomplete="off">
+          <button class="btn btn-soft" id="searchStopLocationBtn" type="button">搜尋地點</button>
+          <button class="btn btn-soft" id="pickStopOnMapBtn" type="button">地圖選擇</button>
+        </div>
+        <p class="location-search-status" id="stopLocationStatus" aria-live="polite"></p>
+        <div class="location-results" id="stopLocationResults" role="listbox" hidden></div>
+      </label>
+
+      <label>
+        地址
+        <input type="text" id="stopAddressInput" placeholder="蘇州市姑蘇區">
+      </label>
+
+      <div class="form-grid">
+        <label>緯度<input type="number" id="stopLatInput" step="0.000001" placeholder="31.314000"></label>
+        <label>經度<input type="number" id="stopLngInput" step="0.000001" placeholder="120.630000"></label>
+      </div>
+
+      <div class="form-grid">
+        <label>抵達時間<input type="time" id="stopArrivalInput"></label>
+        <label>離開時間（選填）<input type="time" id="stopDepartureInput"></label>
+      </div>
+
+      <div class="form-grid">
+        <label>類型
+          <select id="stopCategoryInput">
+            <option value="">未分類</option><option>景點</option><option>餐廳</option><option>咖啡</option><option>住宿</option><option>交通</option>
+          </select>
+        </label>
+        <label>心情
+          <select id="stopMoodInput"><option value="">未記錄</option><option>😄 開心</option><option>😊 放鬆</option><option>😌 平靜</option><option>🥰 喜歡</option><option>🤩 難忘</option></select>
+        </label>
+      </div>
+
+      <label>照片（可選）<input type="file" id="stopPhotoInput" accept="image/*" multiple></label>
+      <label>簡短筆記<textarea id="stopNoteInput" placeholder="在這裡停留時的感受……"></textarea></label>
+
+      <p class="stop-form-status" id="stopFormStatus" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button class="btn btn-soft" type="button" id="cancelStopDialogBtn">完成</button>
+        <button class="btn btn-primary" type="submit">加入地標</button>
       </div>
     </form>
   </dialog>
