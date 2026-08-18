@@ -1972,23 +1972,44 @@ async function saveLegacyTrip(trip, payload) {
     is_shared: payload.is_shared,
     share_token: payload.share_token
   };
+  const legacyPermissionPayload = {
+    ...legacyPayload,
+    can_download: payload.can_download,
+    can_guest_upload: payload.can_guest_upload
+  };
   try {
     let savedId = trip?.id;
     if (trip) {
-      const { data, error } = await client
+      let { data, error } = await client
         .from("trips")
-        .update(legacyPayload)
+        .update(legacyPermissionPayload)
         .eq("id", trip.id)
         .select("id,is_shared,share_token")
         .maybeSingle();
+      if (error && isMissingTripPermissionColumn(error)) {
+        ({ data, error } = await client
+          .from("trips")
+          .update(legacyPayload)
+          .eq("id", trip.id)
+          .select("id,is_shared,share_token")
+          .maybeSingle());
+      }
       if (error) throw error;
       if (!data) throw new Error("旅程沒有成功更新，請重新整理後再試");
     } else {
-      const { data, error } = await client.from("trips").insert({
+      const baseInsert = {
         ...legacyPayload,
         user_id: state.user.id,
         photo_count: 0
+      };
+      let { data, error } = await client.from("trips").insert({
+        ...baseInsert,
+        can_download: payload.can_download,
+        can_guest_upload: payload.can_guest_upload
       }).select("id").single();
+      if (error && isMissingTripPermissionColumn(error)) {
+        ({ data, error } = await client.from("trips").insert(baseInsert).select("id").single());
+      }
       if (error) throw error;
       savedId = data?.id;
     }
@@ -2001,6 +2022,10 @@ async function saveLegacyTrip(trip, payload) {
     console.error("[saveLegacyTrip]", error);
     toast(error.message || "旅途儲存失敗");
   }
+}
+
+function isMissingTripPermissionColumn(error) {
+  return error?.code === "PGRST204" || error?.code === "42703";
 }
 
 async function uploadPhoto(tripId, file) {
