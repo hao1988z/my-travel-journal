@@ -2095,12 +2095,14 @@ async function loadSharedTrip(token) {
 
   const sharedTrip = Array.isArray(data) ? data[0] : data;
   if (error || !sharedTrip?.id || sharedTrip.is_shared !== true) {
+    const errorText = [error?.message, error?.context?.statusText].filter(Boolean).join(" ");
     if (error) {
       const status = Number(error.context?.status || error.status || 0);
       console.error("[loadSharedTrip]", { status, error });
     }
     const status = Number(error?.context?.status || error?.status || 0);
-    const message = status === 404
+    const missingFunction = status === 404 || /function was not found|requested function/i.test(errorText);
+    const message = missingFunction
       ? "分享服務尚未部署，或這個分享連結不存在。"
       : "這個分享連結不存在，或已經關閉。";
     $("tripList").innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
