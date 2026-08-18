@@ -157,6 +157,29 @@
     </div>
   </section>
 
+  <dialog class="photo-viewer" id="photoViewer" aria-labelledby="photoViewerTitle">
+    <div class="photo-viewer-head">
+      <div>
+        <p class="detail-section-eyebrow">PHOTO</p>
+        <h2 id="photoViewerTitle">照片</h2>
+      </div>
+      <button class="icon-btn" id="photoViewerCloseBtn" type="button" aria-label="關閉照片檢視">×</button>
+    </div>
+    <div class="photo-viewer-stage">
+      <button class="photo-viewer-nav photo-viewer-prev" id="photoViewerPrevBtn" type="button" aria-label="上一張">‹</button>
+      <img id="photoViewerImage" alt="旅程照片">
+      <div class="photo-viewer-missing" id="photoViewerMissing" hidden>照片目前無法載入</div>
+      <button class="photo-viewer-nav photo-viewer-next" id="photoViewerNextBtn" type="button" aria-label="下一張">›</button>
+    </div>
+    <div class="photo-viewer-foot">
+      <div>
+        <p class="photo-viewer-caption" id="photoViewerCaption"></p>
+        <p class="photo-viewer-counter" id="photoViewerCounter"></p>
+      </div>
+      <button class="btn btn-soft" id="photoViewerDownloadBtn" type="button">下載照片</button>
+    </div>
+  </dialog>
+
   <dialog class="trip-dialog" id="tripDialog">
     <form method="dialog" class="trip-form" id="tripForm">
       <div class="dialog-head">

@@ -7,6 +7,7 @@ const authRedirectUrl = cfg.AUTH_REDIRECT_URL || new URL("./", window.location.h
 const state = {
   user: null,
   trips: [],
+  diaries: [],
   photoUrls: new Map(),
   markers: new Map(),
   editingTrip: null,
@@ -15,7 +16,11 @@ const state = {
   pendingEmail: "",
   resendTimer: null,
   sharedMode: false,
-  sharedTrip: null
+  sharedTrip: null,
+  schemaMode: "modern",
+  storageBucket: bucket,
+  viewerPhotos: [],
+  viewerIndex: 0
 };
 
 const $ = (id) => document.getElementById(id);
@@ -78,6 +83,15 @@ function bindEvents() {
   });
   $("detailDownloadBtn").addEventListener("click", () => {
     if (state.editingTrip) downloadCover(state.editingTrip, state.sharedMode);
+  });
+  $("photoViewerCloseBtn").addEventListener("click", closePhotoViewer);
+  $("photoViewerPrevBtn").addEventListener("click", () => changePhotoViewer(-1));
+  $("photoViewerNextBtn").addEventListener("click", () => changePhotoViewer(1));
+  $("photoViewerDownloadBtn").addEventListener("click", downloadViewerPhoto);
+  ["detailRecentPhotos", "detailAllPhotos"].forEach((id) => {
+    const container = $(id);
+    container.addEventListener("click", handleDetailPhotoClick);
+    container.addEventListener("keydown", handleDetailPhotoKeydown);
   });
   document.querySelectorAll("[data-detail-tab]").forEach((button) => {
     button.addEventListener("click", () => setDetailTab(button.dataset.detailTab));
@@ -206,6 +220,7 @@ async function signOut() {
   const { error } = await client.auth.signOut();
   if (error) return toast(error.message);
   state.trips = [];
+  state.diaries = [];
   state.photoUrls.clear();
   refreshMarkers();
   renderTrips();
@@ -225,17 +240,89 @@ function setSessionUI() {
 }
 
 async function loadTrips() {
-  const { data, error } = await client
+  const modernResult = await client
     .from("trips")
     .select("*, trip_photos(*)")
     .order("travel_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 
-  if (error) return toast(error.message);
-  state.trips = data || [];
+  const hasLegacyShape = (modernResult.data || []).some((trip) =>
+    trip.name && !trip.location_name && (trip.date_start || trip.photos_meta || trip.expenses)
+  );
+  if (!modernResult.error && !hasLegacyShape) {
+    state.schemaMode = "modern";
+    state.storageBucket = bucket;
+    state.trips = modernResult.data || [];
+    state.diaries = [];
+  } else {
+    // The original app stores photos_meta on trips and diary entries separately.
+    // Keep that data readable while the database remains unchanged.
+    const legacyResult = await client
+      .from("trips")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (legacyResult.error) return toast(legacyResult.error.message);
+    state.schemaMode = "legacy";
+    state.storageBucket = "photos";
+    state.trips = (legacyResult.data || []).map(normalizeLegacyTrip);
+    await loadStandaloneDiaries();
+  }
+
   await hydratePhotoUrls();
   renderTrips();
   refreshMarkers();
+}
+
+async function loadStandaloneDiaries() {
+  const { data, error } = await client
+    .from("diaries")
+    .select("*")
+    .eq("user_id", state.user.id)
+    .order("diary_date", { ascending: false });
+  if (error) {
+    console.error("[loadStandaloneDiaries]", error);
+    state.diaries = [];
+    return;
+  }
+  state.diaries = data || [];
+  state.trips.forEach((trip) => {
+    trip._diaries = state.diaries.filter((diary) => String(diary.trip_id) === String(trip.id));
+  });
+}
+
+function normalizeLegacyTrip(trip) {
+  const photos = parseLegacyPhotos(trip.photos_meta).map((photo, index) => ({
+    id: photo.id || `legacy-${trip.id}-${index}`,
+    storage_path: photo.path,
+    original_name: photo.original_name || photo.name || photo.path.split("/").pop() || `照片 ${index + 1}`,
+    caption: photo.caption || "",
+    signed_url: photo.signed_url || ""
+  }));
+  return {
+    ...trip,
+    title: trip.title ?? trip.name ?? null,
+    location_name: trip.location_name ?? trip.location ?? "",
+    travel_date: trip.travel_date ?? trip.date_start ?? null,
+    travel_date_end: trip.travel_date_end ?? trip.date_end ?? null,
+    mood: trip.mood ?? null,
+    tags: Array.isArray(trip.tags) ? trip.tags : [],
+    cover_path: trip.cover_path || photos[0]?.storage_path || null,
+    trip_photos: photos,
+    _legacy: true
+  };
+}
+
+function parseLegacyPhotos(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter((photo) => photo && typeof photo.path === "string");
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((photo) => photo && typeof photo.path === "string") : [];
+  } catch (error) {
+    console.error("[parseLegacyPhotos]", error);
+    return [];
+  }
 }
 
 async function hydratePhotoUrls() {
@@ -245,7 +332,7 @@ async function hydratePhotoUrls() {
   ))];
   if (!paths.length) return;
 
-  const { data, error } = await client.storage.from(bucket).createSignedUrls(paths, 60 * 60);
+  const { data, error } = await client.storage.from(state.storageBucket).createSignedUrls(paths, 60 * 60);
   if (error) {
     console.error("[hydratePhotoUrls]", error);
     return;
@@ -260,7 +347,8 @@ function renderTrips() {
   const list = $("tripList");
   const query = $("searchInput").value.trim().toLowerCase();
   const filtered = state.trips.filter((trip) => {
-    const haystack = [trip.title, trip.location_name, trip.travel_date, trip.mood, trip.diary, (trip.tags || []).join(" ")]
+    const diaryText = getTripDiaryRecords(trip).map((diary) => [diary.title, diary.content].join(" ")).join(" ");
+    const haystack = [trip.title, trip.location_name, trip.travel_date, trip.mood, trip.diary, diaryText, (trip.tags || []).join(" ")]
       .join(" ")
       .toLowerCase();
     return !query || haystack.includes(query);
@@ -370,6 +458,7 @@ function setDetailTab(tabName) {
 
 function renderTripDetail(trip) {
   const photos = getTripPhotos(trip);
+  const diaries = getTripDiaryRecords(trip);
   const cover = getCoverUrl(trip);
   const name = trip.title || trip.location_name || "未命名旅途";
   const location = trip.location_name || trip.location || "未記錄地點";
@@ -390,19 +479,19 @@ function renderTripDetail(trip) {
 
   $("detailDays").textContent = formatTripDays(dateStart, dateEnd);
   $("detailPhotoCount").textContent = photos.length;
-  $("detailDiaryCount").textContent = trip.diary ? "1" : "0";
+  $("detailDiaryCount").textContent = diaries.length;
   $("detailPlaceCount").textContent = location === "未記錄地點" ? "0" : "1";
   $("detailRoute").innerHTML = `<span class="detail-route-stop">${escapeHtml(location)}</span>`;
   $("detailCoordinates").textContent = numberOrNull(trip.lat) !== null && numberOrNull(trip.lng) !== null
     ? `座標 ${Number(trip.lat).toFixed(5)}, ${Number(trip.lng).toFixed(5)}`
     : "尚未記錄地圖座標";
 
-  const diary = trip.diary?.trim();
-  $("detailDiaryPreview").textContent = diary || "這趟旅程還沒有日記，回來時記下一句當時的心情吧。";
-  $("detailDiaryPreview").classList.toggle("is-empty", !diary);
-  $("detailDiaryDate").textContent = dateLabel || "尚未記錄日期";
-  $("detailDiaryBody").textContent = diary || "這趟旅程還沒有日記。";
-  $("detailDiaryBody").classList.toggle("is-empty", !diary);
+  const diaryPreview = diaries[0]?.content?.trim() || trip.diary?.trim() || "";
+  $("detailDiaryPreview").textContent = diaryPreview || "這趟旅程還沒有日記，回來時記下一句當時的心情吧。";
+  $("detailDiaryPreview").classList.toggle("is-empty", !diaryPreview);
+  $("detailDiaryDate").textContent = diaries[0]?.diary_date || dateLabel || "尚未記錄日期";
+  $("detailDiaryBody").innerHTML = renderDiaryEntries(diaries, trip.diary);
+  $("detailDiaryBody").classList.toggle("is-empty", !diaries.length && !trip.diary);
   $("detailMapSummary").textContent = `${location}${dateLabel ? ` · ${dateLabel}` : ""}`;
 
   const recent = photos.slice(0, 6);
@@ -418,6 +507,28 @@ function getTripPhotos(trip) {
   return trip?.trip_photos || trip?.photos || [];
 }
 
+function getTripDiaryRecords(trip) {
+  if (Array.isArray(trip?._diaries) && trip._diaries.length) return trip._diaries;
+  if (trip?.diary && String(trip.diary).trim()) {
+    return [{ title: "旅行日記", content: String(trip.diary), diary_date: trip.travel_date || "", mood: trip.mood || "" }];
+  }
+  return [];
+}
+
+function renderDiaryEntries(diaries, inlineDiary) {
+  if (!diaries.length && !inlineDiary) return "這趟旅程還沒有日記。";
+  if (!diaries.length) return escapeHtml(inlineDiary);
+  return diaries.map((diary) => `
+    <article class="detail-diary-entry">
+      <div class="detail-diary-entry-head">
+        <strong>${escapeHtml(diary.title || "旅行日記")}</strong>
+        <span>${escapeHtml([diary.diary_date, diary.mood].filter(Boolean).join(" · "))}</span>
+      </div>
+      <p>${escapeHtml(diary.content || "（無內容）")}</p>
+    </article>
+  `).join("");
+}
+
 function getPhotoUrl(photo) {
   return photo?.signed_url || (photo?.storage_path ? state.photoUrls.get(photo.storage_path) : "") || "";
 }
@@ -428,9 +539,98 @@ function renderDetailPhotoGrid(photos, emptyText) {
     const url = getPhotoUrl(photo);
     const label = photo.original_name || photo.name || `照片 ${index + 1}`;
     return url
-      ? `<figure class="detail-photo-tile"><img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy"><figcaption>${escapeHtml(label)}</figcaption></figure>`
-      : `<figure class="detail-photo-tile is-missing"><div>照片載入中</div><figcaption>${escapeHtml(label)}</figcaption></figure>`;
+      ? `<figure class="detail-photo-tile" data-photo-index="${index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}"><img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy"><figcaption>${escapeHtml(label)}</figcaption></figure>`
+      : `<figure class="detail-photo-tile is-missing" data-photo-index="${index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}"><div>照片載入中</div><figcaption>${escapeHtml(label)}</figcaption></figure>`;
   }).join("");
+}
+
+function handleDetailPhotoClick(event) {
+  const tile = event.target.closest("[data-photo-index]");
+  if (!tile) return;
+  openPhotoViewer(Number(tile.dataset.photoIndex));
+}
+
+function handleDetailPhotoKeydown(event) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const tile = event.target.closest("[data-photo-index]");
+  if (!tile) return;
+  event.preventDefault();
+  openPhotoViewer(Number(tile.dataset.photoIndex));
+}
+
+async function openPhotoViewer(index) {
+  const photos = getTripPhotos(state.editingTrip);
+  if (!photos[index]) return;
+  state.viewerPhotos = photos;
+  state.viewerIndex = Math.max(0, Math.min(index, photos.length - 1));
+  $("photoViewer").showModal();
+  await ensurePhotoUrl(state.viewerPhotos[state.viewerIndex]);
+  renderPhotoViewer();
+}
+
+async function ensurePhotoUrl(photo) {
+  if (!photo || getPhotoUrl(photo) || !photo.storage_path) return getPhotoUrl(photo);
+  const { data, error } = await client.storage.from(state.storageBucket).createSignedUrl(photo.storage_path, 60 * 60);
+  if (error) {
+    console.error("[ensurePhotoUrl]", error);
+    return "";
+  }
+  const signedUrl = data?.signedUrl || "";
+  if (signedUrl) state.photoUrls.set(photo.storage_path, signedUrl);
+  return signedUrl;
+}
+
+function renderPhotoViewer() {
+  const photo = state.viewerPhotos[state.viewerIndex];
+  if (!photo) return;
+  const url = getPhotoUrl(photo);
+  const label = photo.original_name || photo.name || `照片 ${state.viewerIndex + 1}`;
+  $("photoViewerTitle").textContent = label;
+  $("photoViewerCaption").textContent = photo.caption || "";
+  $("photoViewerCounter").textContent = `${state.viewerIndex + 1} / ${state.viewerPhotos.length}`;
+  $("photoViewerImage").hidden = !url;
+  $("photoViewerImage").src = url;
+  $("photoViewerMissing").hidden = !!url;
+  $("photoViewerPrevBtn").hidden = state.viewerPhotos.length < 2;
+  $("photoViewerNextBtn").hidden = state.viewerPhotos.length < 2;
+  $("photoViewerDownloadBtn").hidden = !url;
+}
+
+async function changePhotoViewer(direction) {
+  if (!state.viewerPhotos.length) return;
+  state.viewerIndex = (state.viewerIndex + direction + state.viewerPhotos.length) % state.viewerPhotos.length;
+  await ensurePhotoUrl(state.viewerPhotos[state.viewerIndex]);
+  renderPhotoViewer();
+}
+
+function closePhotoViewer() {
+  const viewer = $("photoViewer");
+  if (viewer?.open) viewer.close();
+  state.viewerPhotos = [];
+  state.viewerIndex = 0;
+}
+
+async function downloadViewerPhoto() {
+  const photo = state.viewerPhotos[state.viewerIndex];
+  if (!photo) return;
+  await ensurePhotoUrl(photo);
+  const url = getPhotoUrl(photo);
+  if (!url) return toast("照片目前無法下載");
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`照片下載失敗：HTTP ${response.status}`);
+    const blobUrl = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement("a");
+    anchor.href = blobUrl;
+    anchor.download = photo.original_name || photo.name || "travel-photo.jpg";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  } catch (error) {
+    console.error("[downloadViewerPhoto]", error);
+    toast("照片下載失敗，請稍後再試");
+  }
 }
 
 function renderDetailMap(trip) {
@@ -464,14 +664,31 @@ function renderDetailExpenses(trip) {
     $("detailExpenses").innerHTML = `<div class="detail-empty">這趟旅程尚未記錄花費。</div>`;
     return;
   }
-  const original = expenses.original || {};
-  const twd = expenses.twd || {};
-  const currency = expenses.currency || expenses.orig_currency || "原幣";
-  const rows = Object.entries(original).filter(([, value]) => Number.isFinite(Number(value)) && Number(value) !== 0);
-  const total = Object.values(twd).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  const categories = [
+    ["transport", "交通"],
+    ["hotel", "住宿"],
+    ["food", "餐飲"],
+    ["other", "其他"]
+  ];
+  const original = expenses.original && typeof expenses.original === "object" ? expenses.original : {};
+  const converted = expenses.twd && typeof expenses.twd === "object" ? expenses.twd : {};
+  const legacyConverted = Object.fromEntries(categories.map(([key]) => [key, expenses[key]]));
+  const totalSource = Object.values(converted).some((value) => Number(value)) ? converted : legacyConverted;
+  const hasOriginal = categories.some(([key]) => Number(original[key]) !== 0);
+  const rowSource = hasOriginal ? original : totalSource;
+  const currency = expenses.currency || expenses.orig_currency || (hasOriginal ? "原幣" : "TWD");
+  const rows = categories.filter(([key]) => Number.isFinite(Number(rowSource[key])) && Number(rowSource[key]) !== 0);
+  const total = categories.reduce((sum, [key]) => sum + (Number(totalSource[key]) || 0), 0);
   $("detailExpenses").innerHTML = `
     <div class="detail-expense-total"><span>約合台幣</span><strong>${total ? `NT$ ${Math.round(total).toLocaleString()}` : "尚未換算"}</strong></div>
-    <div class="detail-expense-list">${rows.length ? rows.map(([key, value]) => `<div><span>${escapeHtml(key)}</span><strong>${escapeHtml(currency)} ${Number(value).toLocaleString()}</strong></div>`).join("") : `<div class="detail-empty">尚未記錄支出項目。</div>`}</div>`;
+    <div class="detail-expense-list">${rows.length ? rows.map(([key, label]) => {
+      const value = Number(rowSource[key]);
+      const convertedValue = Number(totalSource[key]);
+      const convertedLabel = hasOriginal && Number.isFinite(convertedValue) && convertedValue !== value
+        ? `<small>約 NT$ ${Math.round(convertedValue).toLocaleString()}</small>`
+        : "";
+      return `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(currency)} ${value.toLocaleString()}${convertedLabel}</strong></div>`;
+    }).join("") : `<div class="detail-empty">尚未記錄支出項目。</div>`}</div>`;
 }
 
 function getShareUrl(token) {
@@ -612,6 +829,13 @@ async function saveTrip(event) {
 
   if (!payload.location_name) return toast("請輸入地點名稱");
 
+  if (state.schemaMode === "legacy") {
+    if (state.selectedPhoto) {
+      return toast("舊版旅程的照片請從原本相簿流程上傳，這次不會覆蓋既有照片");
+    }
+    return saveLegacyTrip(trip, payload);
+  }
+
   let savedTrip = trip;
   let uploadedPhoto = null;
   let committed = false;
@@ -658,10 +882,47 @@ async function saveTrip(event) {
   }
 }
 
+async function saveLegacyTrip(trip, payload) {
+  const legacyPayload = {
+    name: payload.title || payload.location_name,
+    location: payload.location_name,
+    lat: payload.lat,
+    lng: payload.lng,
+    date_start: payload.travel_date,
+    // The legacy form only edits the start date, so preserve an existing end date.
+    date_end: trip?.date_end || payload.travel_date,
+    is_shared: payload.is_shared
+  };
+  try {
+    let savedId = trip?.id;
+    if (trip) {
+      const { error } = await client.from("trips").update(legacyPayload).eq("id", trip.id);
+      if (error) throw error;
+    } else {
+      const { data, error } = await client.from("trips").insert({
+        ...legacyPayload,
+        user_id: state.user.id,
+        photo_count: 0,
+        share_token: crypto.randomUUID()
+      }).select("id").single();
+      if (error) throw error;
+      savedId = data?.id;
+    }
+    clearPhotoPreview();
+    $("tripDialog").close();
+    toast("旅途已儲存");
+    await loadTrips();
+    if (savedId) openTrip(savedId);
+  } catch (error) {
+    console.error("[saveLegacyTrip]", error);
+    toast(error.message || "旅途儲存失敗");
+  }
+}
+
 async function uploadPhoto(tripId, file) {
   const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
   const path = `${state.user.id}/${tripId}/${crypto.randomUUID()}.${ext}`;
-  const { error: uploadError } = await client.storage.from(bucket).upload(path, file, {
+  const { error: uploadError } = await client.storage.from(state.storageBucket).upload(path, file, {
     cacheControl: "3600",
     upsert: false
   });
@@ -695,7 +956,7 @@ async function rollbackUploadedPhoto(record) {
     }
   }
   if (record.storage_path) {
-    const { error } = await client.storage.from(bucket).remove([record.storage_path]);
+    const { error } = await client.storage.from(state.storageBucket).remove([record.storage_path]);
     if (error) console.error("[rollbackUploadedPhoto.storage]", error, record.storage_path);
   }
 }
@@ -719,7 +980,7 @@ async function deleteCurrentTrip() {
 
   let storageClean = true;
   if (paths.length) {
-    const { error: storageError } = await client.storage.from(bucket).remove([...new Set(paths)]);
+    const { error: storageError } = await client.storage.from(state.storageBucket).remove([...new Set(paths)]);
     if (storageError) {
       console.error("[deleteCurrentTrip.storage]", storageError, paths);
       storageClean = false;
@@ -767,8 +1028,9 @@ async function loadSharedTrip(token) {
 }
 
 function getCoverUrl(trip) {
-  const firstPhoto = trip.trip_photos?.[0] || trip.photos?.[0];
-  return firstPhoto?.signed_url || (firstPhoto ? state.photoUrls.get(firstPhoto.storage_path) : "") || "";
+  const photos = getTripPhotos(trip);
+  const coverPhoto = photos.find((photo) => photo.storage_path === trip.cover_path) || photos[0];
+  return coverPhoto?.signed_url || (coverPhoto ? state.photoUrls.get(coverPhoto.storage_path) : "") || "";
 }
 
 async function downloadCover(trip, sharedMode) {
