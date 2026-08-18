@@ -1655,14 +1655,73 @@ body.share-mode #detailAddStopBtn {
 }
 
 .footprint-sheet,
-.stats-sheet {
+.stats-sheet,
+.diary-library-sheet {
   max-height: min(760px, calc(100vh - 32px));
   overflow: auto;
 }
 
 .footprint-body,
-.travel-stats-body {
+.travel-stats-body,
+.diary-library {
   padding: 20px 22px 24px;
+}
+
+.diary-library {
+  display: grid;
+  gap: 12px;
+}
+
+.diary-library-entry {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+}
+
+.diary-library-entry-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.diary-library-entry-head p,
+.diary-library-entry-head h3,
+.diary-library-trip {
+  margin: 0;
+}
+
+.diary-library-entry-head p,
+.diary-library-trip {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.diary-library-entry-head h3 {
+  margin-top: 4px;
+  font-family: "Noto Serif TC", serif;
+  font-size: 20px;
+}
+
+.diary-library-entry-head > span {
+  font-size: 20px;
+}
+
+.diary-library-trip {
+  margin-top: 8px;
+  color: var(--accent-2);
+  font-weight: 700;
+}
+
+.diary-library-content {
+  margin-top: 12px;
+  white-space: pre-wrap;
+  line-height: 1.8;
+}
+
+.diary-library-open {
+  margin-top: 12px;
 }
 
 .footprint-lead {

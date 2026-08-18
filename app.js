@@ -128,6 +128,8 @@ function bindEvents() {
   $("closeMoreMenuBtn").addEventListener("click", () => $("moreMenuSheet").close());
   $("closeFootprintBtn").addEventListener("click", () => $("footprintSheet").close());
   $("closeStatsBtn").addEventListener("click", () => $("statsSheet").close());
+  $("closeDiaryLibraryBtn").addEventListener("click", () => $("diaryLibrarySheet").close());
+  $("diaryLibrary").addEventListener("click", handleDiaryLibraryClick);
   $("closeSettingsBtn").addEventListener("click", () => $("settingsSheet").close());
   $("footprintMapBtn").addEventListener("click", () => {
     $("footprintSheet").close();
@@ -305,7 +307,7 @@ function handleMobileNavigation(destination) {
 
   if (destination === "diary") {
     setMobileNavActive("diary");
-    openLatestTripTab("diary");
+    openDiaryLibrary();
     return;
   }
 
@@ -327,7 +329,7 @@ function openActionSheet(id) {
 }
 
 function closeActionSheets() {
-  ["quickActionSheet", "moreMenuSheet", "footprintSheet", "statsSheet", "settingsSheet"].forEach((id) => {
+  ["quickActionSheet", "moreMenuSheet", "footprintSheet", "statsSheet", "diaryLibrarySheet", "settingsSheet"].forEach((id) => {
     const sheet = $(id);
     if (sheet?.open) sheet.close();
   });
@@ -389,6 +391,11 @@ function handleMoreAction(action) {
   if (action === "settings") {
     $("settingsEmail").textContent = state.user?.email || "登入帳號";
     openActionSheet("settingsSheet");
+    return;
+  }
+
+  if (action === "diary") {
+    openDiaryLibrary();
   }
 }
 
@@ -544,6 +551,55 @@ function openLatestTripTab(tabName) {
   setDetailTab(tabName);
 }
 
+function openDiaryLibrary() {
+  if (!state.diaries.length) {
+    return openLatestTripTab("diary");
+  }
+  closeTripDetail();
+  closeDrawer();
+  renderDiaryLibrary();
+  openActionSheet("diaryLibrarySheet");
+}
+
+function renderDiaryLibrary() {
+  const list = $("diaryLibrary");
+  if (!list) return;
+
+  const diaries = [...state.diaries].sort((a, b) =>
+    String(b.diary_date || b.created_at || "").localeCompare(String(a.diary_date || a.created_at || ""))
+  );
+  list.innerHTML = diaries.length
+    ? diaries.map((diary) => {
+      const trip = state.trips.find((item) => String(item.id) === String(diary.trip_id));
+      const tripLabel = trip?.title || trip?.location_name || "未關聯旅程";
+      return `
+        <article class="diary-library-entry">
+          <div class="diary-library-entry-head">
+            <div>
+              <p>${escapeHtml(diary.diary_date || "未記錄日期")}</p>
+              <h3>${escapeHtml(diary.title || "旅行日記")}</h3>
+            </div>
+            <span>${escapeHtml(diary.mood || "📝")}</span>
+          </div>
+          <p class="diary-library-trip">${escapeHtml(tripLabel)}</p>
+          <div class="diary-library-content">${escapeHtml(diary.content || "（無內容）")}</div>
+          ${trip ? `<button class="text-action diary-library-open" type="button" data-diary-trip-id="${escapeHtml(trip.id)}">查看這趟旅程 →</button>` : ""}
+        </article>
+      `;
+    }).join("")
+    : `<div class="detail-empty">目前沒有可顯示的日記。</div>`;
+}
+
+function handleDiaryLibraryClick(event) {
+  const button = event.target.closest("[data-diary-trip-id]");
+  if (!button) return;
+  const trip = state.trips.find((item) => String(item.id) === String(button.dataset.diaryTripId));
+  if (!trip) return;
+  $("diaryLibrarySheet").close();
+  openTrip(trip.id);
+  setDetailTab("diary");
+}
+
 async function loadTrips() {
   const modernResult = await client
     .from("trips")
@@ -654,7 +710,6 @@ async function loadStandaloneDiaries() {
   const { data, error } = await client
     .from("diaries")
     .select("*")
-    .eq("user_id", state.user.id)
     .order("diary_date", { ascending: false });
   if (error) {
     if (error.code === "PGRST205" || error.code === "42P01") {
@@ -665,7 +720,11 @@ async function loadStandaloneDiaries() {
     state.diaries = [];
     return;
   }
-  state.diaries = data || [];
+  const userId = String(state.user?.id || "");
+  state.diaries = (data || []).filter((diary) => {
+    const ownerId = diary.user_id ?? diary.owner_id ?? diary.created_by;
+    return !ownerId || String(ownerId) === userId;
+  });
   state.trips.forEach((trip) => {
     trip._diaries = state.diaries.filter((diary) => String(diary.trip_id) === String(trip.id));
   });

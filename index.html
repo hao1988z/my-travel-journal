@@ -430,6 +430,7 @@
     </div>
     <div class="more-menu-list">
       <button type="button" data-more-action="photos"><span>相簿</span><small>查看最近旅程的照片</small></button>
+      <button type="button" data-more-action="diary"><span>日記</span><small>閱讀以前寫下的旅行文章</small></button>
       <button type="button" data-more-action="footprints"><span>我的足跡</span><small>在地圖查看所有旅程</small></button>
       <button type="button" disabled><span>月曆</span><small>下一階段接入</small></button>
       <button type="button" data-more-action="timeline"><span>時間軸</span><small>查看最近旅程的照片時間軸</small></button>
@@ -460,6 +461,14 @@
     <div class="travel-stats-body" id="travelStatsBody"></div>
   </dialog>
 
+  <dialog class="action-sheet diary-library-sheet" id="diaryLibrarySheet" aria-labelledby="diaryLibraryTitle">
+    <div class="sheet-head">
+      <div><p class="detail-section-eyebrow">TRAVEL NOTES</p><h2 id="diaryLibraryTitle">旅行日記</h2></div>
+      <button class="icon-btn" id="closeDiaryLibraryBtn" type="button" aria-label="關閉旅行日記">×</button>
+    </div>
+    <div class="diary-library" id="diaryLibrary"></div>
+  </dialog>
+
   <dialog class="action-sheet settings-sheet" id="settingsSheet" aria-labelledby="settingsTitle">
     <div class="sheet-head">
       <div><p class="detail-section-eyebrow">SETTINGS</p><h2 id="settingsTitle">設定</h2></div>
@@ -479,6 +488,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="./config.js"></script>
-  <script src="./app.js?v=20260818-download-all"></script>
+  <script src="./app.js?v=20260818-diary-fix"></script>
 </body>
 </html>
