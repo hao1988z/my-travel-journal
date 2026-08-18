@@ -213,6 +213,13 @@ input:focus, textarea:focus, select:focus {
   gap: 24px;
 }
 
+.home-heading-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
 .home-heading h1 {
   margin: 0;
   font-size: clamp(36px, 4vw, 58px);
@@ -228,6 +235,11 @@ input:focus, textarea:focus, select:focus {
 .home-new-trip {
   flex: 0 0 auto;
   padding: 12px 18px;
+}
+
+.home-diary {
+  min-width: 76px;
+  padding: 12px 16px;
 }
 
 .recent-trip-section,
@@ -1949,12 +1961,60 @@ body.share-mode #detailAddStopBtn {
     gap: 18px;
   }
 
+  .home-heading-actions {
+    width: 100%;
+  }
+
   .home-heading h1 {
     font-size: clamp(34px, 12vw, 48px);
   }
 
+  .home-diary,
   .home-new-trip {
-    width: 100%;
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
+
+  .diary-library-sheet {
+    max-height: calc(100vh - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+
+  .diary-library {
+    gap: 10px;
+    padding: 14px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+
+  .diary-library-entry {
+    padding: 14px;
+  }
+
+  .diary-library-entry-head,
+  .diary-library-entry-head > div {
+    min-width: 0;
+  }
+
+  .diary-library-entry-head h3,
+  .diary-library-trip {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .diary-library-entry-head h3 {
+    font-size: 18px;
+    line-height: 1.45;
+  }
+
+  .diary-library-content {
+    max-height: 42vh;
+    max-height: 42dvh;
+    margin-top: 10px;
+    overflow: auto;
+    font-size: 15px;
+    line-height: 1.75;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .recent-trip-section,
@@ -2132,6 +2192,32 @@ body.share-mode #detailAddStopBtn {
   .detail-section-head h2,
   .detail-panel-heading h2 {
     font-size: 21px;
+  }
+
+  .detail-diary-body,
+  .detail-diary-entry p,
+  .diary {
+    font-size: 16px;
+    line-height: 1.85;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .detail-diary-body {
+    max-width: none;
+  }
+
+  .detail-diary-entry-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+
+  .detail-diary-entry-head strong,
+  .detail-diary-entry-head span {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .detail-photo-grid,

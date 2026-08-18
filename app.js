@@ -82,6 +82,7 @@ function bindEvents() {
   $("signUpBtn").addEventListener("click", signUp);
   setupResendButton();
   $("signOutBtn").addEventListener("click", signOut);
+  $("homeDiaryBtn").addEventListener("click", openDiaryLibrary);
   $("homeNewTripBtn").addEventListener("click", () => openTripDialog());
   $("closeDialogBtn").addEventListener("click", closeTripDialog);
   $("closeDrawerBtn").addEventListener("click", closeDrawer);
@@ -2512,6 +2513,7 @@ async function loadSharedTrip(token) {
   $("authScreen").hidden = true;
   $("appShell").hidden = false;
   document.body.classList.add("share-mode");
+  $("homeDiaryBtn").hidden = true;
   $("homeNewTripBtn").hidden = true;
   $("mobileBottomNav").hidden = true;
   $("tripDialog")?.close();
