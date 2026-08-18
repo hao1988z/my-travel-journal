@@ -107,6 +107,7 @@ function bindEvents() {
     searchLocation();
   });
   $("searchInput").addEventListener("input", renderTrips);
+  document.addEventListener("click", closeTripCardMenus);
 }
 
 function setupResendButton() {
@@ -438,6 +439,7 @@ function renderRecentTrip(trip) {
       <div class="recent-trip-media">
         ${cover ? `<img src="${escapeHtml(cover)}" alt="${escapeHtml(location)}" fetchpriority="high">` : `<div class="trip-placeholder">📍</div>`}
         <span class="recent-trip-badge">${trip.is_shared ? "已分享" : "私人"}</span>
+        ${renderTripCardMenu(trip)}
       </div>
       <div class="recent-trip-body">
         <div>
@@ -465,6 +467,7 @@ function renderTripCard(trip) {
       <div class="trip-card-media">
         ${cover ? `<img src="${escapeHtml(cover)}" alt="${escapeHtml(location)}" loading="lazy">` : `<div class="trip-placeholder">📍</div>`}
         <span class="trip-privacy-dot" title="${trip.is_shared ? "已分享" : "私人旅程"}">${trip.is_shared ? "○" : "•"}</span>
+        ${renderTripCardMenu(trip)}
       </div>
       <div class="trip-card-body">
         <div class="trip-card-title"><span>${escapeHtml(title)}</span></div>
@@ -476,16 +479,79 @@ function renderTripCard(trip) {
   `;
 }
 
+function renderTripCardMenu(trip) {
+  return `
+    <div class="trip-card-menu">
+      <button class="trip-card-menu-trigger" type="button" data-trip-menu aria-label="${escapeHtml(trip.title || trip.location_name || "旅程")} 的更多操作" title="更多操作">•••</button>
+      <div class="trip-card-menu-panel" data-trip-menu-panel hidden>
+        <button type="button" data-trip-action="edit">編輯</button>
+        <button type="button" data-trip-action="share">${trip.is_shared ? "複製分享連結" : "分享設定"}</button>
+        <button class="is-danger" type="button" data-trip-action="delete">刪除</button>
+      </div>
+    </div>
+  `;
+}
+
 function bindTripCards(container) {
   container.querySelectorAll("[data-trip-id]").forEach((card) => {
     const open = () => openTrip(card.dataset.tripId);
     card.addEventListener("click", open);
     card.addEventListener("keydown", (event) => {
+      if (event.target.closest("[data-trip-menu]")) return;
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
       open();
     });
+
+    const menu = card.querySelector("[data-trip-menu]");
+    const panel = card.querySelector("[data-trip-menu-panel]");
+    menu?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      closeTripCardMenus(panel);
+      panel.hidden = false;
+    });
+    menu?.addEventListener("keydown", (event) => event.stopPropagation());
+    panel?.addEventListener("click", (event) => {
+      const actionButton = event.target.closest("[data-trip-action]");
+      if (!actionButton) return;
+      event.stopPropagation();
+      handleTripCardAction(card.dataset.tripId, actionButton.dataset.tripAction);
+    });
   });
+}
+
+function closeTripCardMenus(except = null) {
+  document.querySelectorAll("[data-trip-menu-panel]").forEach((panel) => {
+    if (panel !== except) panel.hidden = true;
+  });
+}
+
+function handleTripCardAction(tripId, action) {
+  const trip = state.trips.find((item) => String(item.id) === String(tripId));
+  if (!trip) return;
+  closeTripCardMenus();
+
+  if (action === "edit") {
+    openTripDialog(trip);
+    return;
+  }
+
+  if (action === "share") {
+    if (!trip.is_shared) {
+      openTripDialog(trip);
+      toast("請在編輯視窗開啟分享連結，再儲存旅程");
+      return;
+    }
+    const shareUrl = getShareUrl(trip.share_token);
+    if (!shareUrl) return toast("請使用 HTTP(S) 網址開啟網站後再分享");
+    copyText(shareUrl);
+    return;
+  }
+
+  if (action === "delete") {
+    state.editingTrip = trip;
+    deleteCurrentTrip();
+  }
 }
 
 function refreshMarkers() {
@@ -608,8 +674,9 @@ function renderTripDetail(trip) {
   const recent = photos.slice(0, 6);
   const recentMarkup = renderDetailPhotoGrid(recent, "目前沒有照片");
   $("detailRecentPhotos").innerHTML = recentMarkup;
-  $("detailAllPhotos").innerHTML = renderDetailPhotoGrid(photos, "這趟旅程還沒有照片");
-  $("detailPhotosSummary").textContent = `${photos.length} 張照片${cover ? " · 已設定封面" : ""}`;
+  $("detailAllPhotos").innerHTML = renderTravelTimeline(trip, photos);
+  const hasPhotoTimes = photos.some((photo) => getPhotoTakenAt(photo));
+  $("detailPhotosSummary").textContent = `${photos.length} 張照片${cover ? " · 已設定封面" : ""}${hasPhotoTimes ? " · 依照片時間分組" : " · 目前依旅程日期排列"}`;
   renderDetailExpenses(trip);
   $("detailOverviewExpenses").innerHTML = $("detailExpenses").innerHTML;
   setDetailTab("overview");
@@ -673,6 +740,152 @@ function renderDetailPhotoGrid(photos, emptyText) {
       ? `<figure class="detail-photo-tile" data-photo-index="${index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}"><img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy"><figcaption>${escapeHtml(label)}</figcaption></figure>`
       : `<figure class="detail-photo-tile is-missing" data-photo-index="${index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}"><div>照片載入中</div><figcaption>${escapeHtml(label)}</figcaption></figure>`;
   }).join("");
+}
+
+function renderTravelTimeline(trip, photos) {
+  if (!photos.length) return `<div class="detail-empty">這趟旅程還沒有照片。</div>`;
+
+  const items = photos.map((photo, index) => getPhotoTimelineItem(trip, photo, index));
+  items.sort((a, b) => {
+    if (a.sortValue !== b.sortValue) return a.sortValue - b.sortValue;
+    return a.index - b.index;
+  });
+
+  const dayGroups = new Map();
+  items.forEach((item) => {
+    if (!dayGroups.has(item.dayKey)) {
+      dayGroups.set(item.dayKey, {
+        dayNumber: item.dayNumber,
+        dateLabel: item.dateLabel,
+        events: new Map(),
+        items: []
+      });
+    }
+    const day = dayGroups.get(item.dayKey);
+    const eventKey = `${item.location}::${item.timeLabel}`;
+    if (!day.events.has(eventKey)) {
+      day.events.set(eventKey, { location: item.location, timeLabel: item.timeLabel, photos: [] });
+    }
+    day.events.get(eventKey).photos.push(item);
+    day.items.push(item);
+  });
+
+  return [...dayGroups.values()].map((day) => `
+    <section class="travel-day">
+      <header class="travel-day-header">
+        <div>
+          <p class="travel-day-label">DAY ${escapeHtml(day.dayNumber)} · ${escapeHtml(day.dateLabel)}</p>
+          <h3>${escapeHtml([...new Set(day.items.map((item) => item.location))].join(" / "))}</h3>
+        </div>
+        <span>${day.items.length} 張</span>
+      </header>
+      <div class="travel-day-events">
+        ${[...day.events.values()].map((event) => `
+          <article class="travel-event">
+            <div class="travel-event-rail" aria-hidden="true"><span></span></div>
+            <div class="travel-event-content">
+              <div class="travel-event-head">
+                <time>${escapeHtml(event.timeLabel)}</time>
+                <h4>${escapeHtml(event.location)}</h4>
+              </div>
+              <div class="detail-photo-grid travel-event-photos">
+                ${event.photos.map((item) => renderTimelinePhotoTile(item)).join("")}
+              </div>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+  `).join("");
+}
+
+function renderTimelinePhotoTile(item) {
+  const photo = item.photo;
+  const url = getPhotoUrl(photo);
+  const label = photo.original_name || photo.name || `照片 ${item.index + 1}`;
+  return url
+    ? `<figure class="detail-photo-tile" data-photo-index="${item.index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}"><img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy"><figcaption>${escapeHtml(label)}</figcaption></figure>`
+    : `<figure class="detail-photo-tile is-missing" data-photo-index="${item.index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}"><div>照片載入中</div><figcaption>${escapeHtml(label)}</figcaption></figure>`;
+}
+
+function getPhotoTimelineItem(trip, photo, index) {
+  const takenAt = getPhotoTakenAt(photo);
+  const tripStart = parseTimelineDate(trip?.travel_date || trip?.date_start);
+  const date = takenAt?.date || tripStart?.date || null;
+  const dayKey = date ? toTimelineDateKey(date) : "unknown";
+  const dayNumber = tripStart?.date && date
+    ? Math.max(1, Math.round((date - tripStart.date) / 86400000) + 1)
+    : 1;
+  const location = getPhotoTimelineLocation(trip, photo);
+  const timeLabel = takenAt?.hasTime ? formatTimelineTime(takenAt.date) : "未記錄時間";
+  return {
+    photo,
+    index,
+    date,
+    dayKey,
+    dayNumber,
+    dateLabel: date ? formatTimelineDate(date) : "日期未記錄",
+    location,
+    timeLabel,
+    sortValue: date ? date.getTime() : Number.MAX_SAFE_INTEGER
+  };
+}
+
+function getPhotoTakenAt(photo) {
+  const raw = photo?.takenAt ?? photo?.taken_at ?? photo?.capturedAt ?? photo?.captured_at ?? photo?.date_taken;
+  if (raw === null || raw === undefined || raw === "") return null;
+  const parsed = parseTimelineDate(raw);
+  if (!parsed) return null;
+  return { date: parsed.date, hasTime: parsed.hasTime };
+}
+
+function parseTimelineDate(raw) {
+  if (raw instanceof Date) {
+    return Number.isNaN(raw.getTime()) ? null : { date: raw, hasTime: true };
+  }
+  if (typeof raw === "number") {
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? null : { date, hasTime: true };
+  }
+
+  const text = String(raw).trim();
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (match) {
+    const date = new Date(
+      Number(match[1]),
+      Number(match[2]) - 1,
+      Number(match[3]),
+      Number(match[4] || 0),
+      Number(match[5] || 0),
+      Number(match[6] || 0)
+    );
+    return Number.isNaN(date.getTime()) ? null : { date, hasTime: !!match[4] };
+  }
+
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? null : { date, hasTime: /\d{1,2}:\d{2}/.test(text) };
+}
+
+function getPhotoTimelineLocation(trip, photo) {
+  const location = photo?.location_name || photo?.location || photo?.place_name || photo?.place || photo?.address;
+  if (location) return String(location);
+  const gps = photo?.gps && typeof photo.gps === "object" ? photo.gps : photo;
+  const lat = numberOrNull(gps?.lat ?? gps?.latitude ?? gps?.gps_lat);
+  const lng = numberOrNull(gps?.lng ?? gps?.longitude ?? gps?.gps_lng);
+  if (lat !== null && lng !== null) return `GPS ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  return getTripLocations(trip)[0] || "未記錄地點";
+}
+
+function toTimelineDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatTimelineDate(date) {
+  return `${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
+function formatTimelineTime(date) {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
 function handleDetailPhotoClick(event) {
