@@ -1241,7 +1241,7 @@ function renderPhotoViewer() {
   $("photoViewerMissing").hidden = !!url;
   $("photoViewerPrevBtn").hidden = state.viewerPhotos.length < 2;
   $("photoViewerNextBtn").hidden = state.viewerPhotos.length < 2;
-  $("photoViewerDownloadBtn").hidden = !url;
+  $("photoViewerDownloadBtn").hidden = !url || (state.sharedMode && !state.editingTrip?.can_download);
 }
 
 async function changePhotoViewer(direction) {
@@ -1261,6 +1261,9 @@ function closePhotoViewer() {
 async function downloadViewerPhoto() {
   const photo = state.viewerPhotos[state.viewerIndex];
   if (!photo) return;
+  if (state.sharedMode && !state.editingTrip?.can_download) {
+    return toast("分享者沒有開放下載");
+  }
   await ensurePhotoUrl(photo);
   const url = getPhotoUrl(photo);
   if (!url) return toast("照片目前無法下載");
@@ -1469,6 +1472,7 @@ async function toggleTripSharing(trip, nextValue = !trip?.is_shared) {
 
 function renderDrawer(trip, sharedMode) {
   const cover = getCoverUrl(trip);
+  const photos = getTripPhotos(trip);
   const shareUrl = getShareUrl(trip.share_token);
   const tags = (trip.tags || []).map((tag) => `<span class="chip">${escapeHtml(tag)}</span>`).join("");
   const photoButtons = cover
@@ -1480,6 +1484,19 @@ function renderDrawer(trip, sharedMode) {
         朋友補照片
         <input type="file" id="guestPhotoInput" accept="image/*">
       </label>
+    `
+    : "";
+  const sharedPhotoGallery = sharedMode && photos.length
+    ? `
+      <section class="shared-photo-section">
+        <div class="shared-photo-section-head">
+          <strong>全部照片</strong>
+          <span>${photos.length} 張 · 點選查看</span>
+        </div>
+        <div class="detail-photo-grid shared-photo-grid" id="sharedPhotoGrid">
+          ${renderDetailPhotoGrid(photos, "目前沒有照片")}
+        </div>
+      </section>
     `
     : "";
   const shareButton = !sharedMode && trip.is_shared
@@ -1499,6 +1516,7 @@ function renderDrawer(trip, sharedMode) {
       ${tags}
     </div>
     ${trip.diary ? `<div class="diary">${escapeHtml(trip.diary)}</div>` : ""}
+    ${sharedPhotoGallery}
     <div class="drawer-actions">
       ${!sharedMode ? `<button class="btn btn-primary" id="editTripBtn">編輯</button>` : ""}
       ${shareButton}
@@ -1516,6 +1534,8 @@ function renderDrawer(trip, sharedMode) {
   $("editTripBtn")?.addEventListener("click", () => openTripDialog(trip));
   $("copyShareBtn")?.addEventListener("click", () => copyText(shareUrl));
   $("repairShareBtn")?.addEventListener("click", () => toggleTripSharing(trip, true));
+  $("sharedPhotoGrid")?.addEventListener("click", handleDetailPhotoClick);
+  $("sharedPhotoGrid")?.addEventListener("keydown", handleDetailPhotoKeydown);
   $("downloadPhotoBtn")?.addEventListener("click", () => downloadCover(trip, sharedMode));
   $("guestPhotoInput")?.addEventListener("change", (event) => uploadGuestPhoto(event, trip.share_token));
 }
@@ -2139,6 +2159,7 @@ async function loadSharedTrip(token) {
     share_token: token,
     trip_photos: (sharedTrip.photos || sharedTrip.trip_photos || []).filter((photo) => photo.signed_url)
   };
+  state.editingTrip = state.sharedTrip;
   state.trips = [state.sharedTrip];
   state.photoUrls = new Map();
   renderTrips();

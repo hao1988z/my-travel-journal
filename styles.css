@@ -654,6 +654,39 @@ input:focus, textarea:focus, select:focus {
   margin-top: 18px;
 }
 
+.shared-photo-section {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.shared-photo-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.shared-photo-section-head strong {
+  font-family: "Noto Serif TC", serif;
+  font-size: 17px;
+}
+
+.shared-photo-section-head span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.shared-photo-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.shared-photo-grid .detail-photo-tile figcaption {
+  display: none;
+}
+
 /* ── TRIP DETAIL PAGE ── */
 .trip-detail-page {
   min-height: calc(100vh - 60px);
