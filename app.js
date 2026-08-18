@@ -1503,6 +1503,68 @@ async function downloadViewerPhoto() {
   }
 }
 
+async function downloadAllPhotos(trip, sharedMode = false) {
+  if (sharedMode && !trip?.can_download) {
+    return toast("分享者沒有開放下載");
+  }
+
+  const photos = getTripPhotos(trip);
+  if (!photos.length) return toast("這趟旅程沒有可下載的照片");
+  if (typeof window.JSZip !== "function") {
+    return toast("下載工具尚未載入，請重新整理頁面");
+  }
+
+  const zip = new window.JSZip();
+  const folderName = (trip.title || trip.location_name || "travel-photos")
+    .replace(/[\\/:*?"<>|]+/g, "-") || "travel-photos";
+  const folder = zip.folder(folderName);
+  let completed = 0;
+  let failed = 0;
+
+  toast(`正在整理 ${photos.length} 張照片…`);
+
+  for (let start = 0; start < photos.length; start += 4) {
+    const batch = photos.slice(start, start + 4);
+    await Promise.all(batch.map(async (photo, offset) => {
+      try {
+        await ensurePhotoUrl(photo);
+        const url = getPhotoUrl(photo);
+        if (!url) throw new Error("signed URL missing");
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const bytes = await response.arrayBuffer();
+        const originalName = photo.original_name || photo.name || `photo-${start + offset + 1}.jpg`;
+        const safeName = originalName.replace(/[\\/:*?"<>|]+/g, "-") || `photo-${start + offset + 1}.jpg`;
+        folder.file(`${String(start + offset + 1).padStart(3, "0")}-${safeName}`, bytes);
+        completed += 1;
+      } catch (error) {
+        failed += 1;
+        console.error("[downloadAllPhotos]", photo, error);
+      }
+    }));
+  }
+
+  if (!completed) return toast("照片目前無法下載");
+
+  try {
+    const blob = await zip.generateAsync({ type: "blob", compression: "STORE" });
+    const blobUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = blobUrl;
+    anchor.download = `${folderName}.zip`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    toast(failed ? `已下載 ${completed} 張，${failed} 張無法取得` : `已下載全部 ${completed} 張照片`);
+  } catch (error) {
+    console.error("[downloadAllPhotos] zip", error);
+    toast("照片打包失敗，請稍後再試");
+  }
+}
+
 function renderDetailMap(trip) {
   const mapElement = $("detailMap");
   const lat = numberOrNull(trip.lat);
@@ -1698,6 +1760,9 @@ function renderDrawer(trip, sharedMode) {
   const photoButtons = cover
     ? `<button class="btn btn-soft" id="downloadPhotoBtn">${sharedMode && !trip.can_download ? "不可下載" : "下載照片"}</button>`
     : "";
+  const downloadAllButton = sharedMode && trip.can_download && photos.length
+    ? `<button class="btn btn-primary" id="downloadAllPhotosBtn">下載全部照片（${photos.length}）</button>`
+    : "";
   const guestUpload = sharedMode && trip.can_guest_upload
     ? `
       <label class="guest-upload">
@@ -1741,6 +1806,7 @@ function renderDrawer(trip, sharedMode) {
       ${!sharedMode ? `<button class="btn btn-primary" id="editTripBtn">編輯</button>` : ""}
       ${shareButton}
       ${photoButtons}
+      ${downloadAllButton}
     </div>
     ${guestUpload}
     ${!sharedMode && trip.is_shared
@@ -1757,6 +1823,7 @@ function renderDrawer(trip, sharedMode) {
   $("sharedPhotoGrid")?.addEventListener("click", handleDetailPhotoClick);
   $("sharedPhotoGrid")?.addEventListener("keydown", handleDetailPhotoKeydown);
   $("downloadPhotoBtn")?.addEventListener("click", () => downloadCover(trip, sharedMode));
+  $("downloadAllPhotosBtn")?.addEventListener("click", () => downloadAllPhotos(trip, sharedMode));
   $("guestPhotoInput")?.addEventListener("change", (event) => uploadGuestPhoto(event, trip.share_token));
 }
 
