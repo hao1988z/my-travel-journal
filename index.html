@@ -122,7 +122,7 @@
               <div><p class="detail-section-eyebrow">DIARY</p><h2>這趟旅程</h2></div>
               <button class="text-action" type="button" onclick="setDetailTab('diary')">閱讀日記 →</button>
             </div>
-            <p class="detail-diary-preview" id="detailDiaryPreview"></p>
+            <div class="detail-diary-preview" id="detailDiaryPreview"></div>
           </article>
         </div>
 
@@ -132,6 +132,14 @@
             <button class="text-action" type="button" onclick="setDetailTab('photos')">查看全部 →</button>
           </div>
           <div class="detail-photo-grid" id="detailRecentPhotos"></div>
+        </article>
+
+        <article class="detail-section detail-section-wide">
+          <div class="detail-section-head">
+            <div><p class="detail-section-eyebrow">TRAVEL BUDGET</p><h2>旅程花費</h2></div>
+            <button class="text-action" type="button" onclick="setDetailTab('expenses')">查看明細 →</button>
+          </div>
+          <div class="detail-expense-summary" id="detailOverviewExpenses"></div>
         </article>
       </div>
 

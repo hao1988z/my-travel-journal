@@ -602,6 +602,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 .detail-route-stop { overflow-wrap: anywhere; }
+.detail-route-arrow { color: var(--accent-2); font-family: system-ui, sans-serif; font-size: 17px; }
 .detail-muted { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
 
 .detail-diary-preview,
@@ -615,11 +616,22 @@ input:focus, textarea:focus, select:focus {
 
 .detail-diary-preview {
   min-height: 92px;
-  display: -webkit-box;
   overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
 }
+
+.detail-diary-preview-entry {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.detail-diary-preview-entry:first-child { padding-top: 0; }
+.detail-diary-preview-entry:last-child { border-bottom: 0; }
+.detail-diary-preview-entry span { color: var(--accent-2); font-size: 11px; }
+.detail-diary-preview-entry strong { font-size: 13px; }
+.detail-diary-preview-entry small { grid-column: 1 / -1; color: var(--muted); font-size: 11px; line-height: 1.6; }
 
 .detail-diary-preview.is-empty,
 .detail-diary-body.is-empty { color: var(--muted); }

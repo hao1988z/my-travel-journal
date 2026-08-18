@@ -487,14 +487,20 @@ function renderTripDetail(trip) {
   $("detailDays").textContent = formatTripDays(dateStart, dateEnd);
   $("detailPhotoCount").textContent = photos.length;
   $("detailDiaryCount").textContent = diaries.length;
-  $("detailPlaceCount").textContent = location === "未記錄地點" ? "0" : "1";
-  $("detailRoute").innerHTML = `<span class="detail-route-stop">${escapeHtml(location)}</span>`;
+  const locations = getTripLocations(trip);
+  $("detailPlaceCount").textContent = locations[0] === "未記錄地點" ? "0" : locations.length;
+  $("detailRoute").innerHTML = locations.map((place, index) => `
+    ${index ? '<span class="detail-route-arrow" aria-hidden="true">→</span>' : ""}
+    <span class="detail-route-stop">${escapeHtml(place)}</span>
+  `).join("");
   $("detailCoordinates").textContent = numberOrNull(trip.lat) !== null && numberOrNull(trip.lng) !== null
-    ? `座標 ${Number(trip.lat).toFixed(5)}, ${Number(trip.lng).toFixed(5)}`
+    ? `${locations.length > 1 ? "主地標座標" : "座標"} ${Number(trip.lat).toFixed(5)}, ${Number(trip.lng).toFixed(5)}`
     : "尚未記錄地圖座標";
 
   const diaryPreview = diaries[0]?.content?.trim() || trip.diary?.trim() || "";
-  $("detailDiaryPreview").textContent = diaryPreview || "這趟旅程還沒有日記，回來時記下一句當時的心情吧。";
+  $("detailDiaryPreview").innerHTML = diaries.length
+    ? renderDiaryPreview(diaries)
+    : escapeHtml(diaryPreview || "這趟旅程還沒有日記，回來時記下一句當時的心情吧。");
   $("detailDiaryPreview").classList.toggle("is-empty", !diaryPreview);
   $("detailDiaryDate").textContent = diaries[0]?.diary_date || dateLabel || "尚未記錄日期";
   $("detailDiaryBody").innerHTML = renderDiaryEntries(diaries, trip.diary);
@@ -507,6 +513,7 @@ function renderTripDetail(trip) {
   $("detailAllPhotos").innerHTML = renderDetailPhotoGrid(photos, "這趟旅程還沒有照片");
   $("detailPhotosSummary").textContent = `${photos.length} 張照片${cover ? " · 已設定封面" : ""}`;
   renderDetailExpenses(trip);
+  $("detailOverviewExpenses").innerHTML = $("detailExpenses").innerHTML;
   setDetailTab("overview");
 }
 
@@ -520,6 +527,25 @@ function getTripDiaryRecords(trip) {
     return [{ title: "旅行日記", content: String(trip.diary), diary_date: trip.travel_date || "", mood: trip.mood || "" }];
   }
   return [];
+}
+
+function getTripLocations(trip) {
+  const raw = String(trip?.location_name || trip?.location || "").trim();
+  if (!raw) return ["未記錄地點"];
+  return raw.split(/\s*(?:\/|→)\s*/).map((place) => place.trim()).filter(Boolean);
+}
+
+function renderDiaryPreview(diaries) {
+  return diaries.slice(0, 3).map((diary) => {
+    const preview = String(diary.content || "").trim().replace(/\s+/g, " ");
+    return `
+      <div class="detail-diary-preview-entry">
+        <span>${escapeHtml(diary.diary_date || "未記錄日期")}</span>
+        <strong>${escapeHtml(diary.title || "旅行日記")}</strong>
+        ${preview ? `<small>${escapeHtml(preview.slice(0, 70))}${preview.length > 70 ? "…" : ""}</small>` : ""}
+      </div>
+    `;
+  }).join("");
 }
 
 function renderDiaryEntries(diaries, inlineDiary) {
