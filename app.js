@@ -21,6 +21,8 @@ const state = {
 const $ = (id) => document.getElementById(id);
 
 let map;
+let detailMap;
+let detailMarker;
 
 boot();
 
@@ -70,6 +72,16 @@ function bindEvents() {
   $("newTripBtn").addEventListener("click", () => openTripDialog());
   $("closeDialogBtn").addEventListener("click", closeTripDialog);
   $("closeDrawerBtn").addEventListener("click", closeDrawer);
+  $("backToTripsBtn").addEventListener("click", closeTripDetail);
+  $("detailEditBtn").addEventListener("click", () => {
+    if (state.editingTrip) openTripDialog(state.editingTrip);
+  });
+  $("detailDownloadBtn").addEventListener("click", () => {
+    if (state.editingTrip) downloadCover(state.editingTrip, state.sharedMode);
+  });
+  document.querySelectorAll("[data-detail-tab]").forEach((button) => {
+    button.addEventListener("click", () => setDetailTab(button.dataset.detailTab));
+  });
   $("tripForm").addEventListener("submit", saveTrip);
   $("deleteTripBtn").addEventListener("click", deleteCurrentTrip);
   $("photoInput").addEventListener("change", handlePhotoInput);
@@ -198,12 +210,14 @@ async function signOut() {
   refreshMarkers();
   renderTrips();
   closeDrawer();
+  closeTripDetail();
 }
 
 function setSessionUI() {
   const signedIn = !!state.user;
   $("authScreen").hidden = signedIn;
   $("appShell").hidden = !signedIn;
+  if (!signedIn) closeTripDetail();
   $("newTripBtn").hidden = !signedIn;
   $("signOutBtn").hidden = !signedIn;
   $("sessionStatus").textContent = signedIn ? `私人雲端 · ${state.user.email}` : "私人雲端";
@@ -312,6 +326,8 @@ function makeMarkerIcon(trip) {
 function openTrip(id) {
   const trip = state.trips.find((item) => item.id === id);
   if (!trip) return;
+
+  if (!state.sharedMode) closeDrawer();
   state.editingTrip = trip;
 
   const lat = numberOrNull(trip.lat);
@@ -320,7 +336,142 @@ function openTrip(id) {
     map.flyTo([lat, lng], 13, { duration: 0.8 });
   }
 
-  renderDrawer(trip, state.sharedMode);
+  if (state.sharedMode) {
+    renderDrawer(trip, true);
+    return;
+  }
+
+  $("appShell").hidden = true;
+  $("tripDetailPage").hidden = false;
+  renderTripDetail(trip);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function closeTripDetail() {
+  const detailPage = $("tripDetailPage");
+  if (!detailPage) return;
+  detailPage.hidden = true;
+  $("appShell").hidden = !(state.user || state.sharedMode);
+  state.editingTrip = null;
+  if (map) setTimeout(() => map.invalidateSize(), 80);
+}
+
+function setDetailTab(tabName) {
+  document.querySelectorAll("[data-detail-tab]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.detailTab === tabName);
+  });
+  document.querySelectorAll(".detail-panel").forEach((panel) => {
+    panel.hidden = panel.id !== `detail-panel-${tabName}`;
+  });
+  if (tabName === "map" && state.editingTrip) {
+    renderDetailMap(state.editingTrip);
+  }
+}
+
+function renderTripDetail(trip) {
+  const photos = getTripPhotos(trip);
+  const cover = getCoverUrl(trip);
+  const name = trip.title || trip.location_name || "未命名旅途";
+  const location = trip.location_name || trip.location || "未記錄地點";
+  const dateStart = trip.travel_date || trip.date_start || "";
+  const dateEnd = trip.date_end || trip.travel_date_end || dateStart;
+  const dateLabel = formatDateRange(dateStart, dateEnd);
+  const mood = trip.mood ? trip.mood.split(" ")[0] : "";
+  const tags = Array.isArray(trip.tags) ? trip.tags : [];
+
+  $("detailHeroMedia").innerHTML = cover
+    ? `<img src="${escapeHtml(cover)}" alt="${escapeHtml(location)}" fetchpriority="high">`
+    : `<div class="detail-hero-placeholder">${escapeHtml(mood || "📍")}</div>`;
+  $("detailKicker").textContent = `${location}${trip.country ? ` · ${trip.country}` : ""}`;
+  $("detailName").textContent = name;
+  $("detailHeroMeta").textContent = [dateLabel, mood, ...tags].filter(Boolean).join("  ·  ");
+  $("detailPrivacy").textContent = trip.is_shared ? "已開啟分享" : "私人旅途";
+  $("detailDownloadBtn").hidden = !cover;
+
+  $("detailDays").textContent = formatTripDays(dateStart, dateEnd);
+  $("detailPhotoCount").textContent = photos.length;
+  $("detailDiaryCount").textContent = trip.diary ? "1" : "0";
+  $("detailPlaceCount").textContent = location === "未記錄地點" ? "0" : "1";
+  $("detailRoute").innerHTML = `<span class="detail-route-stop">${escapeHtml(location)}</span>`;
+  $("detailCoordinates").textContent = numberOrNull(trip.lat) !== null && numberOrNull(trip.lng) !== null
+    ? `座標 ${Number(trip.lat).toFixed(5)}, ${Number(trip.lng).toFixed(5)}`
+    : "尚未記錄地圖座標";
+
+  const diary = trip.diary?.trim();
+  $("detailDiaryPreview").textContent = diary || "這趟旅程還沒有日記，回來時記下一句當時的心情吧。";
+  $("detailDiaryPreview").classList.toggle("is-empty", !diary);
+  $("detailDiaryDate").textContent = dateLabel || "尚未記錄日期";
+  $("detailDiaryBody").textContent = diary || "這趟旅程還沒有日記。";
+  $("detailDiaryBody").classList.toggle("is-empty", !diary);
+  $("detailMapSummary").textContent = `${location}${dateLabel ? ` · ${dateLabel}` : ""}`;
+
+  const recent = photos.slice(0, 6);
+  const recentMarkup = renderDetailPhotoGrid(recent, "目前沒有照片");
+  $("detailRecentPhotos").innerHTML = recentMarkup;
+  $("detailAllPhotos").innerHTML = renderDetailPhotoGrid(photos, "這趟旅程還沒有照片");
+  $("detailPhotosSummary").textContent = `${photos.length} 張照片${cover ? " · 已設定封面" : ""}`;
+  renderDetailExpenses(trip);
+  setDetailTab("overview");
+}
+
+function getTripPhotos(trip) {
+  return trip?.trip_photos || trip?.photos || [];
+}
+
+function getPhotoUrl(photo) {
+  return photo?.signed_url || (photo?.storage_path ? state.photoUrls.get(photo.storage_path) : "") || "";
+}
+
+function renderDetailPhotoGrid(photos, emptyText) {
+  if (!photos.length) return `<div class="detail-empty">${escapeHtml(emptyText)}</div>`;
+  return photos.map((photo, index) => {
+    const url = getPhotoUrl(photo);
+    const label = photo.original_name || photo.name || `照片 ${index + 1}`;
+    return url
+      ? `<figure class="detail-photo-tile"><img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy"><figcaption>${escapeHtml(label)}</figcaption></figure>`
+      : `<figure class="detail-photo-tile is-missing"><div>照片載入中</div><figcaption>${escapeHtml(label)}</figcaption></figure>`;
+  }).join("");
+}
+
+function renderDetailMap(trip) {
+  const mapElement = $("detailMap");
+  const lat = numberOrNull(trip.lat);
+  const lng = numberOrNull(trip.lng);
+  if (!detailMap) {
+    detailMap = L.map(mapElement, { zoomControl: true }).setView([23.6, 121], 7);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap",
+      maxZoom: 19
+    }).addTo(detailMap);
+  }
+  if (detailMarker) detailMarker.remove();
+  if (lat === null || lng === null) {
+    detailMap.setView([23.6, 121], 7);
+    $("detailMapSummary").textContent = "這趟旅程尚未記錄座標";
+  } else {
+    detailMap.setView([lat, lng], 13);
+    detailMarker = L.marker([lat, lng], { icon: makeMarkerIcon(trip) }).addTo(detailMap);
+  }
+  setTimeout(() => detailMap.invalidateSize(), 80);
+}
+
+function renderDetailExpenses(trip) {
+  let expenses = trip.expenses ?? trip.expense ?? null;
+  if (typeof expenses === "string") {
+    try { expenses = JSON.parse(expenses); } catch (error) { expenses = null; }
+  }
+  if (!expenses || typeof expenses !== "object") {
+    $("detailExpenses").innerHTML = `<div class="detail-empty">這趟旅程尚未記錄花費。</div>`;
+    return;
+  }
+  const original = expenses.original || {};
+  const twd = expenses.twd || {};
+  const currency = expenses.currency || expenses.orig_currency || "原幣";
+  const rows = Object.entries(original).filter(([, value]) => Number.isFinite(Number(value)) && Number(value) !== 0);
+  const total = Object.values(twd).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  $("detailExpenses").innerHTML = `
+    <div class="detail-expense-total"><span>約合台幣</span><strong>${total ? `NT$ ${Math.round(total).toLocaleString()}` : "尚未換算"}</strong></div>
+    <div class="detail-expense-list">${rows.length ? rows.map(([key, value]) => `<div><span>${escapeHtml(key)}</span><strong>${escapeHtml(currency)} ${Number(value).toLocaleString()}</strong></div>`).join("") : `<div class="detail-empty">尚未記錄支出項目。</div>`}</div>`;
 }
 
 function getShareUrl(token) {
@@ -577,6 +728,7 @@ async function deleteCurrentTrip() {
 
   $("tripDialog").close();
   closeDrawer();
+  closeTripDetail();
   toast(storageClean ? "已刪除旅途" : "旅途已刪除，但部分照片清理失敗");
   await loadTrips();
 }
@@ -690,6 +842,20 @@ function parseTags(value) {
 function formatDate(value) {
   const [year, month, day] = value.split("-");
   return `${year}年${Number(month)}月${Number(day)}日`;
+}
+
+function formatDateRange(start, end) {
+  if (!start) return "尚未記錄日期";
+  if (!end || start === end) return formatDate(start);
+  return `${formatDate(start)} — ${formatDate(end)}`;
+}
+
+function formatTripDays(start, end) {
+  if (!start) return "—";
+  const startDate = new Date(`${start}T00:00:00`);
+  const endDate = new Date(`${end || start}T00:00:00`);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return "—";
+  return `${Math.max(1, Math.round((endDate - startDate) / 86400000) + 1)} 天`;
 }
 
 function escapeHtml(value) {

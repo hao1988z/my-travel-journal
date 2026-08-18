@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>旅途日記 · Private Cloud</title>
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -70,6 +71,91 @@
       </article>
     </section>
   </main>
+
+  <section class="trip-detail-page" id="tripDetailPage" hidden>
+    <div class="detail-page-shell">
+      <div class="detail-toolbar">
+        <button class="btn btn-soft" id="backToTripsBtn" type="button">← 我的旅途</button>
+        <div class="detail-toolbar-actions">
+          <span class="detail-privacy" id="detailPrivacy">私人</span>
+          <button class="btn btn-soft" id="detailDownloadBtn" type="button">下載封面</button>
+          <button class="btn btn-primary" id="detailEditBtn" type="button">編輯旅途</button>
+        </div>
+      </div>
+
+      <header class="detail-hero" id="detailHero">
+        <div class="detail-hero-media" id="detailHeroMedia"></div>
+        <div class="detail-hero-content">
+          <p class="detail-kicker" id="detailKicker">TRAVEL JOURNAL</p>
+          <h1 id="detailName">旅途詳情</h1>
+          <p class="detail-hero-meta" id="detailHeroMeta"></p>
+        </div>
+      </header>
+
+      <nav class="detail-tabs" aria-label="旅途內容">
+        <button class="detail-tab active" type="button" data-detail-tab="overview">總覽</button>
+        <button class="detail-tab" type="button" data-detail-tab="photos">照片</button>
+        <button class="detail-tab" type="button" data-detail-tab="diary">日記</button>
+        <button class="detail-tab" type="button" data-detail-tab="map">地圖</button>
+        <button class="detail-tab" type="button" data-detail-tab="expenses">花費</button>
+      </nav>
+
+      <div class="detail-panel" id="detail-panel-overview">
+        <div class="detail-stat-grid">
+          <div class="detail-stat"><span>旅行天數</span><strong id="detailDays">—</strong></div>
+          <div class="detail-stat"><span>照片</span><strong id="detailPhotoCount">0</strong></div>
+          <div class="detail-stat"><span>日記</span><strong id="detailDiaryCount">0</strong></div>
+          <div class="detail-stat"><span>地點</span><strong id="detailPlaceCount">1</strong></div>
+        </div>
+
+        <div class="detail-content-grid">
+          <article class="detail-section">
+            <div class="detail-section-head">
+              <div><p class="detail-section-eyebrow">ROUTE</p><h2>旅行路線</h2></div>
+              <button class="text-action" type="button" onclick="setDetailTab('map')">在地圖查看 →</button>
+            </div>
+            <div class="detail-route" id="detailRoute"></div>
+            <p class="detail-muted" id="detailCoordinates"></p>
+          </article>
+          <article class="detail-section">
+            <div class="detail-section-head">
+              <div><p class="detail-section-eyebrow">DIARY</p><h2>這趟旅程</h2></div>
+              <button class="text-action" type="button" onclick="setDetailTab('diary')">閱讀日記 →</button>
+            </div>
+            <p class="detail-diary-preview" id="detailDiaryPreview"></p>
+          </article>
+        </div>
+
+        <article class="detail-section detail-section-wide">
+          <div class="detail-section-head">
+            <div><p class="detail-section-eyebrow">RECENT PHOTOS</p><h2>最近照片</h2></div>
+            <button class="text-action" type="button" onclick="setDetailTab('photos')">查看全部 →</button>
+          </div>
+          <div class="detail-photo-grid" id="detailRecentPhotos"></div>
+        </article>
+      </div>
+
+      <div class="detail-panel" id="detail-panel-photos" hidden>
+        <div class="detail-panel-heading"><p class="detail-section-eyebrow">PHOTO ARCHIVE</p><h2>這趟旅程的照片</h2><p id="detailPhotosSummary"></p></div>
+        <div class="detail-photo-grid detail-photo-grid-large" id="detailAllPhotos"></div>
+      </div>
+
+      <div class="detail-panel" id="detail-panel-diary" hidden>
+        <div class="detail-panel-heading"><p class="detail-section-eyebrow">TRAVEL NOTE</p><h2>旅行日記</h2><p id="detailDiaryDate"></p></div>
+        <div class="detail-diary-body" id="detailDiaryBody"></div>
+      </div>
+
+      <div class="detail-panel" id="detail-panel-map" hidden>
+        <div class="detail-panel-heading"><p class="detail-section-eyebrow">WHERE I WENT</p><h2>旅程地圖</h2><p id="detailMapSummary"></p></div>
+        <div class="detail-map" id="detailMap"></div>
+      </div>
+
+      <div class="detail-panel" id="detail-panel-expenses" hidden>
+        <div class="detail-panel-heading"><p class="detail-section-eyebrow">TRAVEL BUDGET</p><h2>旅程花費</h2><p>沿用目前旅程資料；尚未記錄的項目不會自動補寫。</p></div>
+        <div class="detail-expense-summary" id="detailExpenses"></div>
+      </div>
+    </div>
+  </section>
 
   <dialog class="trip-dialog" id="tripDialog">
     <form method="dialog" class="trip-form" id="tripForm">
