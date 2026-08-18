@@ -664,6 +664,7 @@ function renderTripCard(trip) {
 }
 
 function renderTripCardMenu(trip) {
+  if (state.sharedMode) return "";
   const shareLabel = trip.is_shared
     ? (trip.share_token ? "複製分享連結" : "修復分享連結")
     : "開啟分享";
@@ -714,6 +715,7 @@ function closeTripCardMenus(except = null) {
 }
 
 function handleTripCardAction(tripId, action) {
+  if (state.sharedMode) return toast("分享檢視不可修改旅程");
   const trip = state.trips.find((item) => String(item.id) === String(tripId));
   if (!trip) return;
   closeTripCardMenus();
@@ -990,6 +992,7 @@ function bindItineraryInteractions() {
 }
 
 async function persistStopOrder(list) {
+  if (state.sharedMode) return toast("分享檢視不可修改地標順序");
   if (!state.stopSchemaAvailable) return;
   const rows = [...list.querySelectorAll(".itinerary-stop")];
   const results = await Promise.all(rows.map((row, index) =>
@@ -1420,6 +1423,7 @@ function createShareToken() {
 }
 
 async function toggleTripSharing(trip, nextValue = !trip?.is_shared) {
+  if (state.sharedMode) return toast("分享檢視不可修改分享設定");
   if (!trip?.id || !client) return toast("目前無法更新分享設定");
 
   try {
@@ -1552,6 +1556,7 @@ function closeTripDialog() {
 }
 
 function openTripDialog(trip = null) {
+  if (state.sharedMode) return toast("分享檢視不可編輯旅程");
   state.editingTrip = trip;
   state.selectedPhoto = null;
   state.locationResults = [];
@@ -1588,6 +1593,7 @@ function openTripDialog(trip = null) {
 }
 
 async function openStopDialog() {
+  if (state.sharedMode) return toast("分享檢視不可新增地標");
   const trip = state.editingTrip;
   if (!trip) return;
   if (!state.stopSchemaAvailable) return toast("請先執行 trip_days_stops migration");
@@ -1652,6 +1658,7 @@ function closeStopDialog(reset = true) {
 
 async function saveStop(event) {
   event.preventDefault();
+  if (state.sharedMode) return toast("分享檢視不可儲存地標");
   const trip = state.editingTrip;
   if (!trip || !state.stopSchemaAvailable) return;
   const dayId = $("stopDayInput").value;
@@ -1898,6 +1905,7 @@ async function handlePhotoInput(event) {
 
 async function saveTrip(event) {
   event.preventDefault();
+  if (state.sharedMode) return toast("分享檢視不可儲存旅程");
   const trip = state.editingTrip;
   const isShared = $("sharedInput").checked;
   let shareToken = trip?.share_token || null;
@@ -2098,6 +2106,7 @@ async function deleteTripRow(id) {
 }
 
 async function deleteCurrentTrip() {
+  if (state.sharedMode) return toast("分享檢視不可刪除旅程");
   if (!state.editingTrip) return;
   if (!confirm("確定要刪除這趟旅程嗎？")) return;
 
@@ -2131,6 +2140,11 @@ async function loadSharedTrip(token) {
 
   $("authScreen").hidden = true;
   $("appShell").hidden = false;
+  document.body.classList.add("share-mode");
+  $("homeNewTripBtn").hidden = true;
+  $("mobileBottomNav").hidden = true;
+  $("tripDialog")?.close();
+  $("stopDialog")?.close();
   $("sessionStatus").textContent = "分享檢視";
   setTimeout(() => map.invalidateSize(), 80);
 
@@ -2195,6 +2209,10 @@ async function downloadCover(trip, sharedMode) {
 }
 
 async function uploadGuestPhoto(event, shareToken) {
+  if (!state.sharedMode || !state.sharedTrip?.can_guest_upload) {
+    event.target.value = "";
+    return toast("分享者沒有開放補照片");
+  }
   const file = event.target.files[0];
   if (!file) return;
   if (!file.type.startsWith("image/")) return toast("請選擇圖片檔");

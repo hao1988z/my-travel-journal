@@ -687,6 +687,17 @@ input:focus, textarea:focus, select:focus {
   display: none;
 }
 
+/* A public share link is a read-only view. Keep management controls hidden
+   even if a stale render happens before the share-mode state is applied. */
+body.share-mode .home-new-trip,
+body.share-mode .mobile-bottom-nav,
+body.share-mode .trip-card-menu,
+body.share-mode #detailEditBtn,
+body.share-mode #deleteTripBtn,
+body.share-mode #detailAddStopBtn {
+  display: none !important;
+}
+
 /* ── TRIP DETAIL PAGE ── */
 .trip-detail-page {
   min-height: calc(100vh - 60px);
