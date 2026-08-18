@@ -20,7 +20,6 @@
     <div class="topbar-actions">
       <span class="privacy-pill" id="sessionStatus">私人雲端</span>
       <button class="btn btn-ghost" id="signOutBtn" hidden>登出</button>
-      <button class="btn btn-primary" id="newTripBtn" hidden>新增旅途</button>
     </div>
   </header>
 
@@ -50,14 +49,40 @@
   <main class="app-shell" id="appShell" hidden>
     <aside class="sidebar">
       <div class="sidebar-head">
-        <h2>我的旅途</h2>
-        <input type="search" id="searchInput" placeholder="搜尋地點、日期、心情...">
+        <div class="home-heading">
+          <div>
+            <p class="eyebrow">PRIVATE TRAVEL JOURNAL</p>
+            <h1>我的旅行</h1>
+            <p class="home-subtitle">把走過的地方，慢慢整理成自己的故事。</p>
+          </div>
+          <button class="btn btn-primary home-new-trip" id="homeNewTripBtn" type="button">＋ 新增旅程</button>
+        </div>
       </div>
-      <div class="stats-row">
-        <span><strong id="placeCount">0</strong> 個地點</span>
-        <span><strong id="photoCount">0</strong> 張照片</span>
-      </div>
-      <div class="trip-list" id="tripList"></div>
+
+      <section class="recent-trip-section" aria-labelledby="recentTripHeading">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">最近一次旅行</p>
+            <h2 id="recentTripHeading">繼續回顧</h2>
+          </div>
+        </div>
+        <div id="recentTrip" class="recent-trip"></div>
+      </section>
+
+      <section class="trip-archive" aria-labelledby="tripArchiveHeading">
+        <div class="archive-heading">
+          <div>
+            <p class="section-kicker">TRAVEL ARCHIVE</p>
+            <h2 id="tripArchiveHeading">所有旅程</h2>
+          </div>
+          <input type="search" id="searchInput" placeholder="搜尋旅程、地點、日期..." aria-label="搜尋旅程">
+        </div>
+        <div class="stats-row">
+          <span><strong id="placeCount">0</strong> 趟旅程</span>
+          <span><strong id="photoCount">0</strong> 張照片</span>
+        </div>
+        <div class="trip-list" id="tripList"></div>
+      </section>
     </aside>
 
     <section class="map-panel">

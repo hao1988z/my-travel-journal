@@ -75,7 +75,7 @@ function bindEvents() {
   $("signUpBtn").addEventListener("click", signUp);
   setupResendButton();
   $("signOutBtn").addEventListener("click", signOut);
-  $("newTripBtn").addEventListener("click", () => openTripDialog());
+  $("homeNewTripBtn").addEventListener("click", () => openTripDialog());
   $("closeDialogBtn").addEventListener("click", closeTripDialog);
   $("closeDrawerBtn").addEventListener("click", closeDrawer);
   $("backToTripsBtn").addEventListener("click", closeTripDetail);
@@ -240,7 +240,6 @@ function setSessionUI() {
   $("authScreen").hidden = signedIn;
   $("appShell").hidden = !signedIn;
   if (!signedIn) closeTripDetail();
-  $("newTripBtn").hidden = !signedIn;
   $("signOutBtn").hidden = !signedIn;
   $("sessionStatus").textContent = signedIn ? `私人雲端 · ${state.user.email}` : "私人雲端";
   if (signedIn) setTimeout(() => map.invalidateSize(), 80);
@@ -353,40 +352,139 @@ async function hydratePhotoUrls() {
 function renderTrips() {
   const list = $("tripList");
   const query = $("searchInput").value.trim().toLowerCase();
-  const filtered = state.trips.filter((trip) => {
-    const diaryText = getTripDiaryRecords(trip).map((diary) => [diary.title, diary.content].join(" ")).join(" ");
-    const haystack = [trip.title, trip.location_name, trip.travel_date, trip.mood, trip.diary, diaryText, (trip.tags || []).join(" ")]
-      .join(" ")
-      .toLowerCase();
-    return !query || haystack.includes(query);
-  });
+  const filtered = state.trips.filter((trip) => tripMatchesQuery(trip, query));
+  const sorted = [...filtered].sort(compareTripsByDate);
+  const recent = sorted[0];
 
   $("placeCount").textContent = state.trips.length;
   $("photoCount").textContent = state.trips.reduce((sum, trip) => sum + (trip.trip_photos?.length || 0), 0);
 
   if (!filtered.length) {
-    list.innerHTML = `<div class="empty">還沒有旅途。按右上角「新增旅途」，先放進第一張照片。</div>`;
+    $("recentTrip").innerHTML = `<div class="empty recent-empty">${query ? "找不到符合條件的旅程。" : "還沒有最近旅程。"}</div>`;
+    list.innerHTML = `<div class="empty">${query ? "請換個關鍵字再試一次。" : "從上方「＋ 新增旅程」開始，先記下下一段旅途。"}</div>`;
     return;
   }
 
-  list.innerHTML = filtered.map((trip) => {
-    const cover = getCoverUrl(trip);
-    return `
-      <article class="trip-card" data-trip-id="${trip.id}">
-        ${cover ? `<img src="${escapeHtml(cover)}" alt="${escapeHtml(trip.location_name)}">` : `<div class="trip-placeholder">📍</div>`}
-        <div class="trip-card-body">
-          <div class="trip-card-title">
-            <span>${escapeHtml(trip.title || trip.location_name)}</span>
-            <span>${escapeHtml((trip.mood || "").split(" ")[0])}</span>
-          </div>
-          <div class="trip-meta">${escapeHtml(trip.location_name)}${trip.travel_date ? ` · ${formatDate(trip.travel_date)}` : ""}</div>
-        </div>
-      </article>
-    `;
-  }).join("");
+  $("recentTrip").innerHTML = renderRecentTrip(recent);
+  bindTripCards($("recentTrip"));
 
-  list.querySelectorAll(".trip-card").forEach((card) => {
-    card.addEventListener("click", () => openTrip(card.dataset.tripId));
+  const grouped = new Map();
+  sorted.forEach((trip) => {
+    const year = getTripYear(trip);
+    if (!grouped.has(year)) grouped.set(year, []);
+    grouped.get(year).push(trip);
+  });
+
+  list.innerHTML = [...grouped.entries()].map(([year, trips]) => `
+    <section class="trip-year-group">
+      <div class="trip-year-heading"><h3>${escapeHtml(year)}</h3><span>${trips.length} 趟</span></div>
+      <div class="trip-card-grid">${trips.map(renderTripCard).join("")}</div>
+    </section>
+  `).join("");
+
+  bindTripCards(list);
+}
+
+function tripMatchesQuery(trip, query) {
+  if (!query) return true;
+  const diaryText = getTripDiaryRecords(trip)
+    .map((diary) => [diary.title, diary.content].join(" "))
+    .join(" ");
+  const haystack = [
+    trip.title,
+    trip.location_name,
+    trip.location,
+    trip.travel_date,
+    trip.date_start,
+    trip.travel_date_end,
+    trip.date_end,
+    trip.mood,
+    trip.diary,
+    diaryText,
+    (trip.tags || []).join(" ")
+  ].join(" ").toLowerCase();
+  return haystack.includes(query);
+}
+
+function compareTripsByDate(a, b) {
+  const aValue = getTripDateValue(a);
+  const bValue = getTripDateValue(b);
+  return bValue - aValue;
+}
+
+function getTripDateValue(trip) {
+  const value = trip?.travel_date || trip?.date_start || trip?.created_at || "";
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function getTripYear(trip) {
+  const value = trip?.travel_date || trip?.date_start || trip?.created_at || "未分類";
+  const match = String(value).match(/^(\d{4})/);
+  return match ? match[1] : "未分類";
+}
+
+function renderRecentTrip(trip) {
+  if (!trip) return `<div class="empty recent-empty">還沒有最近旅程。</div>`;
+  const cover = getCoverUrl(trip);
+  const photos = getTripPhotos(trip);
+  const diaries = getTripDiaryRecords(trip);
+  const start = trip.travel_date || trip.date_start || "";
+  const end = trip.travel_date_end || trip.date_end || start;
+  const title = trip.title || trip.location_name || "未命名旅程";
+  const location = trip.location_name || trip.location || "未記錄地點";
+  return `
+    <article class="recent-trip-card" data-trip-id="${escapeHtml(trip.id)}" tabindex="0" role="button" aria-label="回顧${escapeHtml(title)}">
+      <div class="recent-trip-media">
+        ${cover ? `<img src="${escapeHtml(cover)}" alt="${escapeHtml(location)}" fetchpriority="high">` : `<div class="trip-placeholder">📍</div>`}
+        <span class="recent-trip-badge">${trip.is_shared ? "已分享" : "私人"}</span>
+      </div>
+      <div class="recent-trip-body">
+        <div>
+          <p class="section-kicker">最近一次旅行</p>
+          <h3>${escapeHtml(title)}</h3>
+          <p class="recent-trip-meta">${escapeHtml(formatDateRange(start, end))} · ${escapeHtml(location)}</p>
+          <p class="recent-trip-stats">${formatTripDays(start, end)} · ${photos.length} 張照片 · ${diaries.length} 篇日記</p>
+        </div>
+        <span class="recent-trip-link">回顧 <span aria-hidden="true">→</span></span>
+      </div>
+    </article>
+  `;
+}
+
+function renderTripCard(trip) {
+  const cover = getCoverUrl(trip);
+  const photos = getTripPhotos(trip);
+  const diaries = getTripDiaryRecords(trip);
+  const start = trip.travel_date || trip.date_start || "";
+  const end = trip.travel_date_end || trip.date_end || start;
+  const title = trip.title || trip.location_name || "未命名旅程";
+  const location = trip.location_name || trip.location || "未記錄地點";
+  return `
+    <article class="trip-card" data-trip-id="${escapeHtml(trip.id)}" tabindex="0" role="button" aria-label="查看${escapeHtml(title)}">
+      <div class="trip-card-media">
+        ${cover ? `<img src="${escapeHtml(cover)}" alt="${escapeHtml(location)}" loading="lazy">` : `<div class="trip-placeholder">📍</div>`}
+        <span class="trip-privacy-dot" title="${trip.is_shared ? "已分享" : "私人旅程"}">${trip.is_shared ? "○" : "•"}</span>
+      </div>
+      <div class="trip-card-body">
+        <div class="trip-card-title"><span>${escapeHtml(title)}</span></div>
+        <div class="trip-meta">${escapeHtml(location)}</div>
+        <div class="trip-card-date">${escapeHtml(formatDateRange(start, end))}</div>
+        <div class="trip-card-stats"><span>📷 ${photos.length}</span><span>📝 ${diaries.length}</span><span>${escapeHtml(formatTripDays(start, end))}</span></div>
+      </div>
+    </article>
+  `;
+}
+
+function bindTripCards(container) {
+  container.querySelectorAll("[data-trip-id]").forEach((card) => {
+    const open = () => openTrip(card.dataset.tripId);
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      open();
+    });
   });
 }
 
