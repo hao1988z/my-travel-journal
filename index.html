@@ -69,6 +69,28 @@
         <div id="recentTrip" class="recent-trip"></div>
       </section>
 
+      <section class="memory-section" id="memorySection" aria-labelledby="memoryHeading" hidden>
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">ON THIS DAY</p>
+            <h2 id="memoryHeading">回憶這一天</h2>
+          </div>
+        </div>
+        <article class="memory-card" id="memoryCard">
+          <div class="memory-media">
+            <img id="memoryImage" alt="旅行回憶" hidden>
+            <div class="memory-placeholder" id="memoryPlaceholder">✦</div>
+          </div>
+          <div class="memory-body">
+            <p class="memory-date" id="memoryDate"></p>
+            <h3 id="memoryTitle">那一天的旅行</h3>
+            <p class="memory-meta" id="memoryMeta"></p>
+            <p class="memory-text" id="memoryText"></p>
+            <button class="text-action" id="memoryOpenBtn" type="button">回顧這趟旅程 →</button>
+          </div>
+        </article>
+      </section>
+
       <section class="trip-archive" aria-labelledby="tripArchiveHeading">
         <div class="archive-heading">
           <div>
@@ -226,6 +248,7 @@
       <div>
         <p class="detail-section-eyebrow">PHOTO</p>
         <h2 id="photoViewerTitle">照片</h2>
+        <p class="photo-viewer-meta" id="photoViewerMeta"></p>
       </div>
       <button class="icon-btn" id="photoViewerCloseBtn" type="button" aria-label="關閉照片檢視">×</button>
     </div>
@@ -410,10 +433,31 @@
       <button type="button" data-more-action="footprints"><span>我的足跡</span><small>在地圖查看所有旅程</small></button>
       <button type="button" disabled><span>月曆</span><small>下一階段接入</small></button>
       <button type="button" data-more-action="timeline"><span>時間軸</span><small>查看最近旅程的照片時間軸</small></button>
-      <button type="button" disabled><span>統計</span><small>下一階段接入</small></button>
+      <button type="button" data-more-action="stats"><span>統計</span><small>看看自己的旅行習慣</small></button>
       <button type="button" disabled><span>資料管理</span><small>備份功能接入後會放在這裡</small></button>
       <button type="button" data-more-action="settings"><span>設定</span><small>私人雲端與帳號設定</small></button>
     </div>
+  </dialog>
+
+  <dialog class="action-sheet footprint-sheet" id="footprintSheet" aria-labelledby="footprintTitle">
+    <div class="sheet-head">
+      <div><p class="detail-section-eyebrow">MY FOOTPRINTS</p><h2 id="footprintTitle">我的足跡</h2></div>
+      <button class="icon-btn" id="closeFootprintBtn" type="button" aria-label="關閉我的足跡">×</button>
+    </div>
+    <div class="footprint-body">
+      <p class="footprint-lead">我人生去過哪裡？</p>
+      <div class="footprint-stats" id="footprintStats"></div>
+      <button class="footprint-map-link" id="footprintMapBtn" type="button">在世界地圖查看所有足跡 →</button>
+      <div class="footprint-years" id="footprintYears"></div>
+    </div>
+  </dialog>
+
+  <dialog class="action-sheet stats-sheet" id="statsSheet" aria-labelledby="statsTitle">
+    <div class="sheet-head">
+      <div><p class="detail-section-eyebrow">MY TRAVEL</p><h2 id="statsTitle">旅行統計</h2></div>
+      <button class="icon-btn" id="closeStatsBtn" type="button" aria-label="關閉旅行統計">×</button>
+    </div>
+    <div class="travel-stats-body" id="travelStatsBody"></div>
   </dialog>
 
   <dialog class="action-sheet settings-sheet" id="settingsSheet" aria-labelledby="settingsTitle">

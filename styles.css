@@ -438,6 +438,78 @@ input:focus, textarea:focus, select:focus {
   background: rgba(255,255,255,0.5);
 }
 
+.memory-section {
+  padding: 30px clamp(24px, 4vw, 54px) 0;
+}
+
+.memory-card {
+  display: grid;
+  grid-template-columns: minmax(150px, .78fr) minmax(220px, 1.22fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 8px 26px rgba(55, 43, 31, 0.08);
+}
+
+.memory-media {
+  min-height: 205px;
+  background: #e9e1d3;
+}
+
+.memory-media img,
+.memory-placeholder {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 205px;
+  place-items: center;
+  object-fit: cover;
+}
+
+.memory-placeholder {
+  color: var(--accent-2);
+  font-size: 32px;
+}
+
+.memory-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  padding: 22px;
+}
+
+.memory-date {
+  margin: 0;
+  color: var(--accent-2);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.memory-body h3 {
+  margin: 0;
+  font-size: 25px;
+}
+
+.memory-meta,
+.memory-text {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.memory-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.memory-body .text-action { margin-top: 6px; }
+
 .trip-archive .stats-row {
   margin: 22px 0 0;
   padding: 11px 0;
@@ -1331,6 +1403,7 @@ body.share-mode #detailAddStopBtn {
 .photo-viewer-prev { left: 16px; }
 .photo-viewer-next { right: 16px; }
 .photo-viewer-caption { max-width: 70vw; margin: 0 0 4px; color: rgba(255,255,255,.84); font-size: 13px; overflow-wrap: anywhere; }
+.photo-viewer-meta { max-width: 70vw; min-height: 1.4em; margin: 0 0 4px; color: rgba(255,255,255,.62); font-size: 12px; overflow-wrap: anywhere; }
 .photo-viewer-counter { margin: 0; color: rgba(255,255,255,.52); font-size: 12px; }
 
 .trip-dialog {
@@ -1581,6 +1654,117 @@ body.share-mode #detailAddStopBtn {
   opacity: 0.48;
 }
 
+.footprint-sheet,
+.stats-sheet {
+  max-height: min(760px, calc(100vh - 32px));
+  overflow: auto;
+}
+
+.footprint-body,
+.travel-stats-body {
+  padding: 20px 22px 24px;
+}
+
+.footprint-lead {
+  margin: 0 0 16px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.footprint-stats,
+.travel-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.footprint-stat,
+.travel-stat-card {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 12px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+}
+
+.footprint-stat span,
+.travel-stat-card span { font-size: 20px; }
+.footprint-stat strong,
+.travel-stat-card strong { font-size: 22px; line-height: 1.1; }
+.footprint-stat small,
+.travel-stat-card small { color: var(--muted); font-size: 11px; }
+
+.footprint-map-link {
+  width: 100%;
+  margin: 18px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #f3eadc;
+  color: var(--accent-2);
+  cursor: pointer;
+  font-weight: 700;
+  text-align: left;
+}
+
+.footprint-map-link:hover,
+.footprint-map-link:focus-visible { border-color: var(--accent-2); outline: none; }
+
+.footprint-years { display: grid; gap: 18px; }
+
+.footprint-year-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.footprint-year-head h3 { margin: 0; font-size: 21px; }
+.footprint-year-head span { color: var(--muted); font-size: 12px; }
+.footprint-trip-list { display: grid; gap: 6px; padding-top: 7px; }
+
+.footprint-trip-list button {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 8px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.footprint-trip-list button:hover,
+.footprint-trip-list button:focus-visible { background: var(--field); outline: none; }
+.footprint-trip-list button > span { font-size: 20px; }
+.footprint-trip-list strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.footprint-trip-list small { color: var(--muted); }
+
+.travel-stats-year {
+  margin-bottom: 16px;
+  color: var(--accent-2);
+  font-weight: 700;
+  letter-spacing: .1em;
+}
+
+.travel-insights {
+  display: grid;
+  gap: 0;
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.travel-insights h3 { margin: 16px 0 6px; font-size: 20px; }
+.travel-insights div { display: flex; justify-content: space-between; gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.travel-insights span { color: var(--muted); }
+.travel-insights strong { text-align: right; }
+
 .settings-summary {
   display: grid;
   gap: 6px;
@@ -1723,6 +1907,23 @@ body.share-mode #detailAddStopBtn {
     grid-template-columns: 1fr;
   }
 
+  .memory-section {
+    padding-inline: 18px;
+  }
+
+  .memory-card {
+    grid-template-columns: 1fr;
+  }
+
+  .memory-media {
+    min-height: 180px;
+  }
+
+  .memory-media img,
+  .memory-placeholder {
+    min-height: 180px;
+  }
+
   .recent-trip-media {
     min-height: 210px;
   }
@@ -1744,6 +1945,19 @@ body.share-mode #detailAddStopBtn {
   .trip-card-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+  }
+
+  .footprint-stats,
+  .travel-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .footprint-trip-list button {
+    grid-template-columns: 28px 1fr;
+  }
+
+  .footprint-trip-list small {
+    grid-column: 2;
   }
 
   .trip-card-media {

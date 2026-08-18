@@ -126,7 +126,17 @@ function bindEvents() {
   $("mobileAddBtn").addEventListener("click", () => openActionSheet("quickActionSheet"));
   $("closeQuickActionBtn").addEventListener("click", () => $("quickActionSheet").close());
   $("closeMoreMenuBtn").addEventListener("click", () => $("moreMenuSheet").close());
+  $("closeFootprintBtn").addEventListener("click", () => $("footprintSheet").close());
+  $("closeStatsBtn").addEventListener("click", () => $("statsSheet").close());
   $("closeSettingsBtn").addEventListener("click", () => $("settingsSheet").close());
+  $("footprintMapBtn").addEventListener("click", () => {
+    $("footprintSheet").close();
+    handleMobileNavigation("map");
+  });
+  $("memoryOpenBtn").addEventListener("click", () => {
+    const tripId = $("memoryOpenBtn").dataset.tripId;
+    if (tripId) openTrip(tripId);
+  });
   $("mobileSignOutBtn").addEventListener("click", signOut);
   document.querySelectorAll("[data-quick-action]").forEach((button) => {
     button.addEventListener("click", () => handleQuickAction(button.dataset.quickAction));
@@ -317,7 +327,7 @@ function openActionSheet(id) {
 }
 
 function closeActionSheets() {
-  ["quickActionSheet", "moreMenuSheet", "settingsSheet"].forEach((id) => {
+  ["quickActionSheet", "moreMenuSheet", "footprintSheet", "statsSheet", "settingsSheet"].forEach((id) => {
     const sheet = $(id);
     if (sheet?.open) sheet.close();
   });
@@ -366,7 +376,13 @@ function handleMoreAction(action) {
   }
 
   if (action === "footprints") {
-    handleMobileNavigation("map");
+    openFootprints();
+    return;
+  }
+
+  if (action === "stats") {
+    renderTravelStats();
+    openActionSheet("statsSheet");
     return;
   }
 
@@ -378,6 +394,146 @@ function handleMoreAction(action) {
 
 function getRecentTrip() {
   return [...state.trips].sort(compareTripsByDate)[0] || null;
+}
+
+function openFootprints() {
+  closeTripDetail();
+  closeDrawer();
+  renderFootprints();
+  setMobileNavActive("more");
+  openActionSheet("footprintSheet");
+}
+
+function renderFootprints() {
+  const trips = state.trips;
+  const countries = [...new Set(trips.map((trip) => getTripCountry(trip)).filter(Boolean))];
+  const cities = [...new Set(trips.flatMap((trip) => getTripLocations(trip)).filter((place) => place !== "未記錄地點"))];
+  const days = trips.reduce((sum, trip) => sum + getTripDayCount(trip), 0);
+  $("footprintStats").innerHTML = [
+    ["🌍", countries.length, "個國家"],
+    ["🏙️", cities.length, "個城市"],
+    ["🧳", trips.length, "趟旅行"],
+    ["📅", days, "個旅行日"]
+  ].map(([icon, value, label]) => `<div class="footprint-stat"><span>${icon}</span><strong>${value}</strong><small>${label}</small></div>`).join("");
+
+  const grouped = new Map();
+  [...trips].sort(compareTripsByDate).forEach((trip) => {
+    const year = getTripYear(trip);
+    if (!grouped.has(year)) grouped.set(year, []);
+    grouped.get(year).push(trip);
+  });
+  $("footprintYears").innerHTML = [...grouped.entries()].map(([year, yearTrips]) => `
+    <section class="footprint-year">
+      <div class="footprint-year-head"><h3>${escapeHtml(year)}</h3><span>${yearTrips.length} 趟</span></div>
+      <div class="footprint-trip-list">
+        ${yearTrips.map((trip) => `<button type="button" data-footprint-trip="${escapeHtml(trip.id)}"><span>${escapeHtml(trip.mood?.split(" ")[0] || "📍")}</span><strong>${escapeHtml(trip.title || trip.location_name || "未命名旅程")}</strong><small>${escapeHtml(trip.location_name || "未記錄地點")}</small></button>`).join("")}
+      </div>
+    </section>
+  `).join("") || `<div class="detail-empty">新增第一趟旅行後，這裡會留下你的足跡。</div>`;
+  $("footprintYears").querySelectorAll("[data-footprint-trip]").forEach((button) => {
+    button.addEventListener("click", () => {
+      $("footprintSheet").close();
+      openTrip(button.dataset.footprintTrip);
+    });
+  });
+}
+
+function getTripCountry(trip) {
+  return String(trip?.country || trip?.country_name || "").trim();
+}
+
+function getTripDayCount(trip) {
+  const start = trip?.travel_date || trip?.date_start;
+  const end = trip?.travel_date_end || trip?.date_end || start;
+  if (!start) return 0;
+  const startDate = new Date(`${start}T00:00:00`);
+  const endDate = new Date(`${end}T00:00:00`);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return 0;
+  return Math.max(1, Math.round((endDate - startDate) / 86400000) + 1);
+}
+
+function renderMemoryOfToday() {
+  const section = $("memorySection");
+  if (state.sharedMode) {
+    section.hidden = true;
+    return;
+  }
+  const memory = findMemoryOfToday();
+  if (!memory) {
+    section.hidden = true;
+    return;
+  }
+
+  const image = $("memoryImage");
+  const placeholder = $("memoryPlaceholder");
+  const cover = getCoverUrl(memory.trip);
+  image.hidden = !cover;
+  image.src = cover || "";
+  placeholder.hidden = !!cover;
+  $("memoryDate").textContent = `${memory.year} 年的今天`;
+  $("memoryTitle").textContent = memory.trip.title || memory.trip.location_name || "那一天的旅行";
+  $("memoryMeta").textContent = [memory.dateLabel, memory.trip.location_name, `${getTripPhotos(memory.trip).length} 張照片`].filter(Boolean).join(" · ");
+  $("memoryText").textContent = memory.diary || "那一天留下的照片，正在等你重新翻開。";
+  $("memoryOpenBtn").dataset.tripId = memory.trip.id;
+  section.hidden = false;
+}
+
+function findMemoryOfToday() {
+  const today = new Date();
+  const month = today.getMonth() + 1;
+  const day = today.getDate();
+  const currentYear = today.getFullYear();
+  const candidates = [];
+  state.trips.forEach((trip) => {
+    const dateText = trip.travel_date || trip.date_start || "";
+    const match = String(dateText).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match || Number(match[1]) >= currentYear) return;
+    if (Number(match[2]) !== month || Number(match[3]) !== day) return;
+    const diary = getTripDiaryRecords(trip)[0];
+    candidates.push({
+      trip,
+      year: Number(match[1]),
+      dateLabel: `${match[1]}.${match[2]}.${match[3]}`,
+      diary: diary?.content?.trim() || trip.diary?.trim() || ""
+    });
+  });
+  return candidates.sort((a, b) => b.year - a.year)[0] || null;
+}
+
+function renderTravelStats() {
+  const trips = state.trips;
+  const photos = trips.reduce((sum, trip) => sum + getTripPhotos(trip).length, 0);
+  const diaries = trips.reduce((sum, trip) => sum + getTripDiaryRecords(trip).length, 0);
+  const days = trips.reduce((sum, trip) => sum + getTripDayCount(trip), 0);
+  const cities = [...new Set(trips.flatMap((trip) => getTripLocations(trip)).filter((place) => place !== "未記錄地點"))];
+  const countries = [...new Set(trips.map((trip) => getTripCountry(trip)).filter(Boolean))];
+  const moodCounts = new Map();
+  trips.forEach((trip) => {
+    const mood = String(trip.mood || "").split(" ")[0];
+    if (mood) moodCounts.set(mood, (moodCounts.get(mood) || 0) + 1);
+  });
+  const favoriteMood = [...moodCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
+  const cityCounts = new Map();
+  trips.forEach((trip) => getTripLocations(trip).filter((place) => place !== "未記錄地點").forEach((place) => cityCounts.set(place, (cityCounts.get(place) || 0) + 1)));
+  const favoriteCity = [...cityCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
+  const mostPhotos = [...trips].sort((a, b) => getTripPhotos(b).length - getTripPhotos(a).length)[0];
+  const longestTrip = [...trips].sort((a, b) => getTripDayCount(b) - getTripDayCount(a))[0];
+  const currentYear = String(new Date().getFullYear());
+  const currentYearTrips = trips.filter((trip) => getTripYear(trip) === currentYear);
+  $("travelStatsBody").innerHTML = `
+    <div class="travel-stats-year">${escapeHtml(currentYear)} MY TRAVEL</div>
+    <div class="travel-stat-grid">
+      ${[["🧳", trips.length, "趟旅行"], ["📅", days, "旅行日"], ["📷", photos, "張照片"], ["🏙️", cities.length, "個城市"], ["📝", diaries, "篇日記"], ["🌍", countries.length, "個國家"]].map(([icon, value, label]) => `<div class="travel-stat-card"><span>${icon}</span><strong>${value.toLocaleString()}</strong><small>${label}</small></div>`).join("")}
+    </div>
+    <div class="travel-insights">
+      <h3>${currentYear} 的旅行印記</h3>
+      <div><span>今年旅行</span><strong>${currentYearTrips.length} 趟</strong></div>
+      <div><span>最常去</span><strong>${escapeHtml(favoriteCity)}</strong></div>
+      <div><span>照片最多</span><strong>${escapeHtml(mostPhotos?.title || mostPhotos?.location_name || "—")}</strong></div>
+      <div><span>旅行最久</span><strong>${escapeHtml(longestTrip ? `${longestTrip.title || longestTrip.location_name || "未命名"} · ${getTripDayCount(longestTrip)} 天` : "—")}</strong></div>
+      <div><span>最常出現的心情</span><strong>${escapeHtml(favoriteMood)}</strong></div>
+    </div>
+  `;
 }
 
 function openLatestTripTab(tabName) {
@@ -574,6 +730,8 @@ function renderTrips() {
   const filtered = state.trips.filter((trip) => tripMatchesQuery(trip, query));
   const sorted = [...filtered].sort(compareTripsByDate);
   const recent = sorted[0];
+
+  renderMemoryOfToday();
 
   $("placeCount").textContent = state.trips.length;
   $("photoCount").textContent = state.trips.reduce((sum, trip) => sum + (trip.trip_photos?.length || 0), 0);
@@ -779,6 +937,21 @@ function refreshMarkers() {
 
   const points = [];
   state.trips.forEach((trip) => {
+    const stops = getTripStops(trip)
+      .map((stop, index) => ({ ...stop, index, lat: numberOrNull(stop.lat), lng: numberOrNull(stop.lng) }))
+      .filter((stop) => stop.lat !== null && stop.lng !== null);
+
+    if (stops.length) {
+      stops.forEach((stop) => {
+        const marker = L.marker([stop.lat, stop.lng], { icon: makeStopMarkerIcon(stop.index + 1) }).addTo(map);
+        marker.bindPopup(`<strong>${escapeHtml(stop.name)}</strong><br>${escapeHtml(trip.title || trip.location_name || "旅程")}`);
+        marker.on("click", () => openTrip(trip.id));
+        state.markers.set(`${trip.id}:${stop.id}`, marker);
+        points.push([stop.lat, stop.lng]);
+      });
+      return;
+    }
+
     const lat = numberOrNull(trip.lat);
     const lng = numberOrNull(trip.lng);
     if (lat === null || lng === null) return;
@@ -1272,7 +1445,14 @@ function renderPhotoViewer() {
   if (!photo) return;
   const url = getPhotoUrl(photo);
   const label = photo.original_name || photo.name || `照片 ${state.viewerIndex + 1}`;
+  const linkedStop = getTripStops(state.editingTrip).find((stop) => String(stop.id) === String(photo.trip_stop_id));
+  const takenAt = getPhotoTakenAt(photo);
+  const viewerLocation = linkedStop?.name || getPhotoTimelineLocation(state.editingTrip, photo);
   $("photoViewerTitle").textContent = label;
+  $("photoViewerMeta").textContent = [
+    takenAt?.date ? `${takenAt.date.getFullYear()}.${String(takenAt.date.getMonth() + 1).padStart(2, "0")}.${String(takenAt.date.getDate()).padStart(2, "0")}${takenAt.hasTime ? ` · ${formatTimelineTime(takenAt.date)}` : ""}` : "",
+    viewerLocation ? `📍 ${viewerLocation}` : ""
+  ].filter(Boolean).join("  ");
   $("photoViewerCaption").textContent = photo.caption || "";
   $("photoViewerCounter").textContent = `${state.viewerIndex + 1} / ${state.viewerPhotos.length}`;
   $("photoViewerImage").hidden = !url;
@@ -2249,6 +2429,7 @@ async function uploadGuestPhoto(event, shareToken) {
     event.target.value = "";
     return toast("分享者沒有開放補照片");
   }
+  const input = event.target;
   const file = event.target.files[0];
   if (!file) return;
   if (!file.type.startsWith("image/")) return toast("請選擇圖片檔");
@@ -2257,22 +2438,32 @@ async function uploadGuestPhoto(event, shareToken) {
   form.append("share_token", shareToken);
   form.append("photo", file);
 
-  const response = await fetch(`${cfg.SUPABASE_URL}/functions/v1/upload-shared-photo`, {
-    method: "POST",
-    headers: {
-      apikey: cfg.SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${cfg.SUPABASE_ANON_KEY}`
-    },
-    body: form
-  });
+  try {
+    const response = await fetch(`${cfg.SUPABASE_URL}/functions/v1/upload-shared-photo`, {
+      method: "POST",
+      headers: {
+        apikey: cfg.SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${cfg.SUPABASE_ANON_KEY}`
+      },
+      body: form
+    });
 
-  if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    return toast(payload.error || "上傳失敗");
-  }
+    if (!response.ok) {
+      const missingFunction = response.status === 404 || payload.code === "NOT_FOUND";
+      return toast(missingFunction
+        ? "補照片服務尚未部署，請通知網站管理者"
+        : (payload.error || "上傳失敗"));
+    }
 
-  toast("照片已補上");
-  await loadSharedTrip(shareToken);
+    toast("照片已補上");
+    await loadSharedTrip(shareToken);
+  } catch (error) {
+    console.error("[uploadGuestPhoto]", error);
+    toast("補照片服務目前無法連線");
+  } finally {
+    input.value = "";
+  }
 }
 
 async function copyText(text, successMessage = "分享連結已複製") {
