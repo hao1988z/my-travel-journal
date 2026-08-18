@@ -90,6 +90,9 @@ function bindEvents() {
   $("detailEditBtn").addEventListener("click", () => {
     if (state.editingTrip) openTripDialog(state.editingTrip);
   });
+  $("detailEditExpensesBtn").addEventListener("click", () => {
+    if (state.editingTrip) openTripDialog(state.editingTrip);
+  });
   $("detailDownloadBtn").addEventListener("click", () => {
     if (state.editingTrip) downloadCover(state.editingTrip, state.sharedMode);
   });
@@ -1204,13 +1207,13 @@ function renderTripItinerary(trip) {
   addButton.title = state.stopSchemaAvailable ? "新增一天中的地標" : "請先執行 trip_days_stops migration";
 
   if (!state.stopSchemaAvailable) {
+    const stopError = escapeHtml(state.stopSchemaError || "");
     $("detailItinerarySummary").textContent = state.stopSchemaError
       ? "地標資料目前無法讀取，請重新整理"
       : "目前仍使用原本的旅程地點資料";
-    $("detailItineraryList").innerHTML = [
-      `<div class="itinerary-empty"><strong>${state.stopSchemaError ? "地標資料讀取失敗" : "多地標功能尚未啟用"}</strong>`,
-      `<p>${state.stopSchemaError ? "請確認已登入正確的 Supabase 專案，並重新整理頁面。錯誤代碼：${escapeHtml(state.stopSchemaError)}" : "現有旅程不會受到影響。執行專案內的 migration 後，就能建立 Day、地標、抵達時間與每日路線。"}</p></div>`
-    ].join("");
+    $("detailItineraryList").innerHTML = state.stopSchemaError
+      ? `<div class="itinerary-empty"><strong>地標資料讀取失敗</strong><p>請確認已登入正確的 Supabase 專案，並重新整理頁面。錯誤代碼：${stopError}</p></div>`
+      : `<div class="itinerary-empty"><strong>多地標功能尚未啟用</strong><p>現有旅程不會受到影響。執行專案內的 migration 後，就能建立 Day、地標、抵達時間與每日路線。</p></div>`;
     return;
   }
 
@@ -1767,6 +1770,70 @@ function renderDetailExpenses(trip) {
     }).join("") : `<div class="detail-empty">尚未記錄支出項目。</div>`}</div>`;
 }
 
+const expenseCategories = ["transport", "hotel", "food", "other"];
+
+function parseExpenseRecord(value) {
+  if (!value) return null;
+  if (typeof value === "object") return value;
+  if (typeof value !== "string") return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch (error) {
+    console.warn("[parseExpenseRecord]", error);
+    return null;
+  }
+}
+
+function getExpenseEditorValues(value) {
+  const expenses = parseExpenseRecord(value) || {};
+  const source = expenses.original && typeof expenses.original === "object"
+    ? expenses.original
+    : expenses;
+  return {
+    currency: expenses.orig_currency || expenses.currency || "TWD",
+    transport: source.transport ?? "",
+    hotel: source.hotel ?? "",
+    food: source.food ?? "",
+    other: source.other ?? ""
+  };
+}
+
+function fillExpenseEditor(value) {
+  const values = getExpenseEditorValues(value);
+  $("expenseCurrencyInput").value = values.currency;
+  expenseCategories.forEach((category) => {
+    $(`expense${category[0].toUpperCase()}${category.slice(1)}Input`).value = values[category];
+  });
+}
+
+function readExpenseEditor(existingValue) {
+  const existing = parseExpenseRecord(existingValue) || {};
+  const values = Object.fromEntries(expenseCategories.map((category) => {
+    const id = `expense${category[0].toUpperCase()}${category.slice(1)}Input`;
+    const value = Number($(id).value);
+    return [category, Number.isFinite(value) && value > 0 ? value : 0];
+  }));
+  const hasAmount = expenseCategories.some((category) => values[category] > 0);
+  if (!hasAmount) return null;
+
+  const currency = $("expenseCurrencyInput").value || "TWD";
+  const next = { ...existing, currency, orig_currency: currency, original: values };
+  if (currency === "TWD") {
+    next.rate = 1;
+    expenseCategories.forEach((category) => { next[category] = values[category]; });
+    delete next.twd;
+  } else if (Number.isFinite(Number(existing.rate)) && Number(existing.rate) > 0) {
+    const rate = Number(existing.rate);
+    next.twd = Object.fromEntries(expenseCategories.map((category) => [category, Math.round(values[category] * rate)]));
+    expenseCategories.forEach((category) => { next[category] = next.twd[category]; });
+  } else {
+    // Preserve the selected original amounts until a live exchange rate is available.
+    expenseCategories.forEach((category) => { next[category] = values[category]; });
+  }
+  return JSON.stringify(next);
+}
+
 function getShareUrl(token) {
   if (!token || !/^https?:$/.test(location.protocol)) return "";
   const url = new URL(location.href);
@@ -1949,6 +2016,7 @@ function openTripDialog(trip = null) {
     $("moodInput").value = trip.mood || "";
     $("diaryInput").value = trip.diary || "";
     $("tagsInput").value = (trip.tags || []).join(", ");
+    fillExpenseEditor(trip.expenses ?? trip.expense);
     $("sharedInput").checked = !!trip.is_shared;
     $("downloadInput").checked = !!trip.can_download;
     $("guestUploadInput").checked = !!trip.can_guest_upload;
@@ -1959,6 +2027,7 @@ function openTripDialog(trip = null) {
     }
   } else {
     $("dateInput").value = new Date().toISOString().slice(0, 10);
+    fillExpenseEditor(null);
   }
 
   $("tripDialog").showModal();
@@ -2298,6 +2367,7 @@ async function saveTrip(event) {
     mood: $("moodInput").value || null,
     diary: $("diaryInput").value.trim() || null,
     tags: parseTags($("tagsInput").value),
+    expenses: readExpenseEditor(trip?.expenses ?? trip?.expense),
     is_shared: isShared,
     share_token: shareToken,
     can_download: $("downloadInput").checked,
@@ -2369,6 +2439,7 @@ async function saveLegacyTrip(trip, payload) {
     date_start: payload.travel_date,
     // The legacy form only edits the start date, so preserve an existing end date.
     date_end: trip?.date_end || payload.travel_date,
+    expenses: payload.expenses,
     is_shared: payload.is_shared,
     share_token: payload.share_token
   };
@@ -2389,7 +2460,17 @@ async function saveLegacyTrip(trip, payload) {
       if (error && isMissingTripPermissionColumn(error)) {
         ({ data, error } = await client
           .from("trips")
-          .update(legacyPayload)
+          .update({
+            name: legacyPayload.name,
+            location: legacyPayload.location,
+            lat: legacyPayload.lat,
+            lng: legacyPayload.lng,
+            date_start: legacyPayload.date_start,
+            date_end: legacyPayload.date_end,
+            expenses: legacyPayload.expenses,
+            is_shared: legacyPayload.is_shared,
+            share_token: legacyPayload.share_token
+          })
           .eq("id", trip.id)
           .select("id,is_shared,share_token")
           .maybeSingle());

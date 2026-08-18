@@ -218,7 +218,7 @@
       </div>
 
       <div class="detail-panel" id="detail-panel-expenses" hidden>
-        <div class="detail-panel-heading"><p class="detail-section-eyebrow">TRAVEL BUDGET</p><h2>旅程花費</h2><p>沿用目前旅程資料；尚未記錄的項目不會自動補寫。</p></div>
+        <div class="detail-panel-heading detail-panel-heading-row"><div><p class="detail-section-eyebrow">TRAVEL BUDGET</p><h2>旅程花費</h2><p>沿用目前旅程資料；尚未記錄的項目不會自動補寫。</p></div><button class="btn btn-soft" type="button" id="detailEditExpensesBtn">編輯花費</button></div>
         <div class="detail-expense-summary" id="detailExpenses"></div>
       </div>
     </div>
@@ -339,6 +339,27 @@
         標籤
         <input type="text" id="tagsInput" placeholder="美食, 古蹟, 海邊">
       </label>
+
+      <fieldset class="permissions expense-editor">
+        <legend>旅程花費</legend>
+        <label>
+          幣別
+          <select id="expenseCurrencyInput">
+            <option value="TWD">TWD · 新台幣</option>
+            <option value="JPY">JPY · 日圓</option>
+            <option value="CNY">CNY · 人民幣</option>
+            <option value="USD">USD · 美元</option>
+            <option value="KRW">KRW · 韓元</option>
+          </select>
+        </label>
+        <div class="form-grid">
+          <label>交通<input type="number" id="expenseTransportInput" min="0" step="0.01" placeholder="0"></label>
+          <label>住宿<input type="number" id="expenseHotelInput" min="0" step="0.01" placeholder="0"></label>
+          <label>餐飲<input type="number" id="expenseFoodInput" min="0" step="0.01" placeholder="0"></label>
+          <label>其他<input type="number" id="expenseOtherInput" min="0" step="0.01" placeholder="0"></label>
+        </div>
+        <p class="expense-editor-note">清空全部金額即可移除這趟旅程的花費紀錄。</p>
+      </fieldset>
 
       <fieldset class="permissions">
         <legend>分享權限</legend>
@@ -491,6 +512,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="./config.js?v=20260818-old-project"></script>
-  <script src="./app.js?v=20260818-diary-ui"></script>
+  <script src="./app.js?v=20260818-stop-error-fix"></script>
 </body>
 </html>
