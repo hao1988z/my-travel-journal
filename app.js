@@ -644,7 +644,7 @@ async function loadTrips() {
       .order("created_at", { ascending: false });
     if (legacyResult.error) return toast(legacyResult.error.message);
     state.schemaMode = "legacy";
-    state.storageBucket = "photos";
+    state.storageBucket = bucket;
     state.trips = (legacyResult.data || []).map(normalizeLegacyTrip);
     await loadStandaloneDiaries();
   }
