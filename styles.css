@@ -1673,6 +1673,10 @@ body.share-mode #detailAddStopBtn {
   overflow: auto;
 }
 
+.diary-library-sheet {
+  width: min(720px, calc(100vw - 28px));
+}
+
 .footprint-body,
 .travel-stats-body,
 .diary-library {
@@ -1685,6 +1689,8 @@ body.share-mode #detailAddStopBtn {
 }
 
 .diary-library-entry {
+  min-width: 0;
+  overflow: hidden;
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1696,6 +1702,11 @@ body.share-mode #detailAddStopBtn {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
+}
+
+.diary-library-entry-head > div {
+  min-width: 0;
 }
 
 .diary-library-entry-head p,
@@ -1714,6 +1725,8 @@ body.share-mode #detailAddStopBtn {
   margin-top: 4px;
   font-family: "Noto Serif TC", serif;
   font-size: 20px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .diary-library-entry-head > span {
@@ -1727,9 +1740,13 @@ body.share-mode #detailAddStopBtn {
 }
 
 .diary-library-content {
+  min-width: 0;
+  max-width: 100%;
   margin-top: 12px;
   white-space: pre-wrap;
   line-height: 1.8;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .diary-library-open {
