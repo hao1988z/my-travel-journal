@@ -2457,6 +2457,9 @@ async function saveLegacyTrip(trip, payload) {
         .eq("id", trip.id)
         .select("id,is_shared,share_token")
         .maybeSingle();
+      if (error && isMissingTripExpenseColumn(error)) {
+        throw new Error("目前 Supabase trips 表缺少 expenses 欄位，請先執行 expenses migration");
+      }
       if (error && isMissingTripPermissionColumn(error)) {
         ({ data, error } = await client
           .from("trips")
@@ -2507,6 +2510,10 @@ async function saveLegacyTrip(trip, payload) {
 
 function isMissingTripPermissionColumn(error) {
   return error?.code === "PGRST204" || error?.code === "42703";
+}
+
+function isMissingTripExpenseColumn(error) {
+  return isMissingTripPermissionColumn(error) && /expenses?/i.test(error?.message || "");
 }
 
 async function uploadPhoto(tripId, file) {
