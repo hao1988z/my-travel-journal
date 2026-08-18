@@ -428,28 +428,52 @@ async function loadTrips() {
 async function loadTripStops() {
   state.stopSchemaAvailable = false;
   state.trips.forEach((trip) => { trip.trip_days = []; });
-  if (state.schemaMode !== "modern" || !state.trips.length) return;
+  // Stops are linked by trip id, so they work with both the modern trip
+  // shape and the legacy trip shape used by older records.
+  if (!state.trips.length) return;
 
-  const { data, error } = await client
+  // Query the two tables separately. This avoids depending on PostgREST's
+  // relationship cache immediately after the additive migration is run.
+  const { data: days, error: daysError } = await client
     .from("trip_days")
-    .select("*, trip_stops(*)")
+    .select("*")
     .in("trip_id", state.trips.map((trip) => trip.id))
     .order("day_number", { ascending: true })
     .order("sort_order", { ascending: true });
 
-  if (error) {
-    if (error.code === "PGRST205" || error.code === "42P01") return;
-    console.error("[loadTripStops]", error);
+  if (daysError) {
+    if (daysError.code === "PGRST205" || daysError.code === "42P01") return;
+    console.error("[loadTripStops.days]", daysError);
     return;
+  }
+
+  const dayRows = days || [];
+  const dayIds = dayRows.map((day) => day.id).filter(Boolean);
+  let stopRows = [];
+  if (dayIds.length) {
+    const { data: stops, error: stopsError } = await client
+      .from("trip_stops")
+      .select("*")
+      .in("day_id", dayIds)
+      .order("sort_order", { ascending: true });
+
+    if (stopsError) {
+      if (stopsError.code === "PGRST205" || stopsError.code === "42P01") return;
+      console.error("[loadTripStops.stops]", stopsError);
+      return;
+    }
+    stopRows = stops || [];
   }
 
   state.stopSchemaAvailable = true;
   state.trips.forEach((trip) => {
-    trip.trip_days = (data || [])
+    trip.trip_days = dayRows
       .filter((day) => String(day.trip_id) === String(trip.id))
       .map((day) => ({
         ...day,
-        trip_stops: [...(day.trip_stops || [])].sort(compareStops)
+        trip_stops: stopRows
+          .filter((stop) => String(stop.day_id) === String(day.id))
+          .sort(compareStops)
       }));
   });
 }
