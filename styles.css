@@ -1014,6 +1014,8 @@ body.share-mode #detailAddStopBtn {
 .itinerary-stop-body small { display: block; margin-top: 5px; color: #46464b; font-size: 12px; white-space: pre-wrap; }
 .itinerary-stop-photos { display: inline-block; margin-top: 5px; color: var(--accent); font-size: 11px; font-weight: 700; }
 .itinerary-stop-map { white-space: nowrap; }
+.itinerary-stop-actions { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.itinerary-stop-delete { color: var(--danger); }
 .itinerary-day-empty { padding: 20px; color: var(--muted); font-size: 13px; }
 
 .itinerary-empty {
@@ -2284,6 +2286,12 @@ body.share-mode #detailAddStopBtn {
   }
 
   .itinerary-stop-map {
+    grid-column: auto;
+    justify-self: start;
+    margin-top: 2px;
+  }
+
+  .itinerary-stop-actions {
     grid-column: 3;
     justify-self: start;
     margin-top: 2px;

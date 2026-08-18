@@ -1253,8 +1253,9 @@ function renderItineraryStop(stop, index, photos) {
     "</time></div><p>", escapeHtml(meta || stop.address || "尚未記錄抵達時間"), "</p>",
     stop.note ? "<small>" + escapeHtml(stop.note) + "</small>" : "",
     stopPhotos ? "<span class=\"itinerary-stop-photos\">📷 " + stopPhotos + " 張照片</span>" : "",
-    "</div><button class=\"text-action itinerary-stop-map\" type=\"button\" data-stop-map=\"",
-    escapeHtml(stop.id), "\">地圖 →</button></article>"
+    "</div><div class=\"itinerary-stop-actions\"><button class=\"text-action itinerary-stop-map\" type=\"button\" data-stop-map=\"",
+    escapeHtml(stop.id), "\">地圖 →</button><button class=\"text-action itinerary-stop-delete\" type=\"button\" data-stop-delete=\"",
+    escapeHtml(stop.id), "\">刪除</button></div></article>"
   ].join("");
 }
 
@@ -1286,6 +1287,7 @@ function bindItineraryInteractions() {
       state.selectedStopId = row.dataset.stopId;
       setDetailTab("map");
     });
+    row.querySelector("[data-stop-delete]")?.addEventListener("click", () => deleteStop(row.dataset.stopId));
   });
   container.querySelectorAll(".itinerary-stop-list").forEach((list) => {
     list.addEventListener("drop", () => persistStopOrder(list));
@@ -1302,6 +1304,37 @@ async function persistStopOrder(list) {
   const failed = results.find((result) => result.error);
   if (failed) return toast(failed.error.message || "地標排序儲存失敗");
   toast("地標順序已儲存");
+}
+
+async function deleteStop(stopId) {
+  if (state.sharedMode) return toast("分享檢視不可刪除地標");
+  const trip = state.editingTrip;
+  const stop = getTripStops(trip).find((item) => String(item.id) === String(stopId));
+  if (!stop) return toast("找不到這個地標");
+  if (!window.confirm(`確定要刪除「${stop.name}」嗎？`)) return;
+
+  const { data, error } = await client
+    .from("trip_stops")
+    .delete()
+    .eq("id", stopId)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("[deleteStop]", error);
+    return toast(error.message || "地標刪除失敗");
+  }
+  if (!data) return toast("地標沒有成功刪除，請重新整理後再試");
+
+  const updatedTrip = state.trips.find((item) => String(item.id) === String(trip.id)) || trip;
+  updatedTrip.trip_days = (updatedTrip.trip_days || []).map((day) => ({
+    ...day,
+    trip_stops: (day.trip_stops || []).filter((item) => String(item.id) !== String(stopId))
+  }));
+  state.editingTrip = updatedTrip;
+  refreshMarkers();
+  renderTripDetail(updatedTrip);
+  setDetailTab("itinerary");
+  toast("地標已刪除");
 }
 
 function renderDiaryPreview(diaries) {
