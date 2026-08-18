@@ -17,6 +17,7 @@ const state = {
   resendTimer: null,
   sharedMode: false,
   sharedTrip: null,
+  diaryLoadError: "",
   schemaMode: "modern",
   storageBucket: bucket,
   viewerPhotos: [],
@@ -552,20 +553,36 @@ function openLatestTripTab(tabName) {
 }
 
 function openDiaryLibrary() {
-  if (!state.diaries.length) {
-    return openLatestTripTab("diary");
-  }
   closeTripDetail();
   closeDrawer();
   renderDiaryLibrary();
   openActionSheet("diaryLibrarySheet");
 }
 
+function getAllDiaryRecords() {
+  const records = [...state.diaries];
+  const linkedTripIds = new Set(records.map((diary) => String(diary.trip_id || "")));
+
+  state.trips.forEach((trip) => {
+    if (!trip?.diary || linkedTripIds.has(String(trip.id))) return;
+    records.push({
+      id: `trip-diary-${trip.id}`,
+      title: trip.title || trip.location_name || "旅行日記",
+      content: trip.diary,
+      diary_date: trip.travel_date || trip.date_start || "",
+      mood: trip.mood || "",
+      trip_id: trip.id
+    });
+  });
+
+  return records;
+}
+
 function renderDiaryLibrary() {
   const list = $("diaryLibrary");
   if (!list) return;
 
-  const diaries = [...state.diaries].sort((a, b) =>
+  const diaries = getAllDiaryRecords().sort((a, b) =>
     String(b.diary_date || b.created_at || "").localeCompare(String(a.diary_date || a.created_at || ""))
   );
   list.innerHTML = diaries.length
@@ -587,7 +604,7 @@ function renderDiaryLibrary() {
         </article>
       `;
     }).join("")
-    : `<div class="detail-empty">目前沒有可顯示的日記。</div>`;
+    : `<div class="detail-empty">${state.diaryLoadError ? `日記載入失敗：${escapeHtml(state.diaryLoadError)}` : "目前沒有可顯示的日記。"}</div>`;
 }
 
 function handleDiaryLibraryClick(event) {
@@ -707,24 +724,36 @@ function compareStops(a, b) {
 }
 
 async function loadStandaloneDiaries() {
-  const { data, error } = await client
+  state.diaryLoadError = "";
+  let { data, error } = await client
     .from("diaries")
     .select("*")
     .order("diary_date", { ascending: false });
+
+  // Keep compatibility with older diary tables that may not expose diary_date
+  // through the current PostgREST schema cache.
+  if (error) {
+    const fallback = await client.from("diaries").select("*");
+    if (!fallback.error) {
+      data = fallback.data;
+      error = null;
+    }
+  }
+
   if (error) {
     if (error.code === "PGRST205" || error.code === "42P01") {
       state.diaries = [];
+      state.diaryLoadError = "找不到 diaries 資料表";
       return;
     }
     console.error("[loadStandaloneDiaries]", error);
     state.diaries = [];
+    state.diaryLoadError = error.message || error.code || "未知錯誤";
     return;
   }
-  const userId = String(state.user?.id || "");
-  state.diaries = (data || []).filter((diary) => {
-    const ownerId = diary.user_id ?? diary.owner_id ?? diary.created_by;
-    return !ownerId || String(ownerId) === userId;
-  });
+  // The original app relied on Supabase RLS here. Keep that behavior so
+  // older rows are not hidden when the ownership column has a legacy name.
+  state.diaries = data || [];
   state.trips.forEach((trip) => {
     trip._diaries = state.diaries.filter((diary) => String(diary.trip_id) === String(trip.id));
   });
