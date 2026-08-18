@@ -2093,16 +2093,24 @@ async function loadSharedTrip(token) {
     body: { share_token: token }
   });
 
-  if (error || !data?.id || data.is_shared !== true) {
-    if (error) console.error("[loadSharedTrip]", error);
-    $("tripList").innerHTML = `<div class="empty">這個分享連結不存在，或已經關閉。</div>`;
+  const sharedTrip = Array.isArray(data) ? data[0] : data;
+  if (error || !sharedTrip?.id || sharedTrip.is_shared !== true) {
+    if (error) {
+      const status = Number(error.context?.status || error.status || 0);
+      console.error("[loadSharedTrip]", { status, error });
+    }
+    const status = Number(error?.context?.status || error?.status || 0);
+    const message = status === 404
+      ? "分享服務尚未部署，或這個分享連結不存在。"
+      : "這個分享連結不存在，或已經關閉。";
+    $("tripList").innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
     return;
   }
 
   state.sharedTrip = {
-    ...data,
+    ...sharedTrip,
     share_token: token,
-    trip_photos: (data.photos || []).filter((photo) => photo.signed_url)
+    trip_photos: (sharedTrip.photos || sharedTrip.trip_photos || []).filter((photo) => photo.signed_url)
   };
   state.trips = [state.sharedTrip];
   state.photoUrls = new Map();

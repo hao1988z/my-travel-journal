@@ -1,0 +1,2 @@
+[functions.get-shared-trip]
+verify_jwt = false
