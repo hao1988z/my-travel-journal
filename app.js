@@ -24,6 +24,7 @@ const state = {
   locationResults: [],
   stopLocationResults: [],
   stopSchemaAvailable: false,
+  stopSchemaError: "",
   selectedStopId: null
 };
 
@@ -427,6 +428,7 @@ async function loadTrips() {
 
 async function loadTripStops() {
   state.stopSchemaAvailable = false;
+  state.stopSchemaError = "";
   state.trips.forEach((trip) => { trip.trip_days = []; });
   // Stops are linked by trip id, so they work with both the modern trip
   // shape and the legacy trip shape used by older records.
@@ -442,7 +444,11 @@ async function loadTripStops() {
     .order("sort_order", { ascending: true });
 
   if (daysError) {
-    if (daysError.code === "PGRST205" || daysError.code === "42P01") return;
+    if (daysError.code === "PGRST205" || daysError.code === "42P01") {
+      state.stopSchemaError = "找不到 trip_days 資料表";
+      return;
+    }
+    state.stopSchemaError = daysError.code || daysError.message || "trip_days 讀取失敗";
     console.error("[loadTripStops.days]", daysError);
     return;
   }
@@ -458,7 +464,11 @@ async function loadTripStops() {
       .order("sort_order", { ascending: true });
 
     if (stopsError) {
-      if (stopsError.code === "PGRST205" || stopsError.code === "42P01") return;
+      if (stopsError.code === "PGRST205" || stopsError.code === "42P01") {
+        state.stopSchemaError = "找不到 trip_stops 資料表";
+        return;
+      }
+      state.stopSchemaError = stopsError.code || stopsError.message || "trip_stops 讀取失敗";
       console.error("[loadTripStops.stops]", stopsError);
       return;
     }
@@ -932,10 +942,12 @@ function renderTripItinerary(trip) {
   addButton.title = state.stopSchemaAvailable ? "新增一天中的地標" : "請先執行 trip_days_stops migration";
 
   if (!state.stopSchemaAvailable) {
-    $("detailItinerarySummary").textContent = "目前仍使用原本的旅程地點資料";
+    $("detailItinerarySummary").textContent = state.stopSchemaError
+      ? "地標資料目前無法讀取，請重新整理"
+      : "目前仍使用原本的旅程地點資料";
     $("detailItineraryList").innerHTML = [
-      "<div class=\"itinerary-empty\"><strong>多地標功能尚未啟用</strong>",
-      "<p>現有旅程不會受到影響。執行專案內的 migration 後，就能建立 Day、地標、抵達時間與每日路線。</p></div>"
+      `<div class="itinerary-empty"><strong>${state.stopSchemaError ? "地標資料讀取失敗" : "多地標功能尚未啟用"}</strong>`,
+      `<p>${state.stopSchemaError ? "請確認已登入正確的 Supabase 專案，並重新整理頁面。錯誤代碼：${escapeHtml(state.stopSchemaError)}" : "現有旅程不會受到影響。執行專案內的 migration 後，就能建立 Day、地標、抵達時間與每日路線。"}</p></div>`
     ].join("");
     return;
   }
