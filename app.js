@@ -657,12 +657,15 @@ function renderTripCard(trip) {
 }
 
 function renderTripCardMenu(trip) {
+  const shareLabel = trip.is_shared
+    ? (trip.share_token ? "複製分享連結" : "修復分享連結")
+    : "開啟分享";
   return `
     <div class="trip-card-menu">
       <button class="trip-card-menu-trigger" type="button" data-trip-menu aria-label="${escapeHtml(trip.title || trip.location_name || "旅程")} 的更多操作" title="更多操作">•••</button>
       <div class="trip-card-menu-panel" data-trip-menu-panel hidden>
         <button type="button" data-trip-action="edit">編輯</button>
-        <button type="button" data-trip-action="share">${trip.is_shared ? "複製分享連結" : "分享設定"}</button>
+        <button type="button" data-trip-action="share">${shareLabel}</button>
         <button class="is-danger" type="button" data-trip-action="delete">刪除</button>
       </div>
     </div>
@@ -714,11 +717,7 @@ function handleTripCardAction(tripId, action) {
   }
 
   if (action === "share") {
-    if (!trip.is_shared) {
-      openTripDialog(trip);
-      toast("請在編輯視窗開啟分享連結，再儲存旅程");
-      return;
-    }
+    if (!trip.is_shared || !trip.share_token) return toggleTripSharing(trip, true);
     const shareUrl = getShareUrl(trip.share_token);
     if (!shareUrl) return toast("請使用 HTTP(S) 網址開啟網站後再分享");
     copyText(shareUrl);
@@ -1396,6 +1395,71 @@ function getShareUrl(token) {
   return url.href;
 }
 
+function createShareToken() {
+  const cryptoApi = globalThis.crypto;
+  if (typeof cryptoApi?.randomUUID === "function") return cryptoApi.randomUUID();
+  if (typeof cryptoApi?.getRandomValues === "function") {
+    const bytes = new Uint8Array(16);
+    cryptoApi.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+  throw new Error("此瀏覽器無法安全產生分享 token");
+}
+
+async function toggleTripSharing(trip, nextValue = !trip?.is_shared) {
+  if (!trip?.id || !client) return toast("目前無法更新分享設定");
+
+  try {
+    const payload = { is_shared: Boolean(nextValue) };
+    if (payload.is_shared) payload.share_token = trip.share_token || createShareToken();
+    const { data, error } = await client
+      .from("trips")
+      .update(payload)
+      .eq("id", trip.id)
+      .select("id,is_shared,share_token")
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) throw new Error("旅程沒有成功更新，請重新整理後再試");
+
+    Object.assign(trip, data);
+    if (state.sharedTrip && String(state.sharedTrip.id) === String(trip.id)) {
+      Object.assign(state.sharedTrip, data);
+    }
+
+    renderTrips();
+    refreshMarkers();
+
+    if (state.editingTrip && String(state.editingTrip.id) === String(trip.id)) {
+      state.editingTrip = trip;
+      if (!$('tripDetailPage')?.hidden && !state.sharedMode) {
+        const activeTab = document.querySelector("[data-detail-tab].active")?.dataset.detailTab || "overview";
+        renderTripDetail(trip);
+        setDetailTab(activeTab);
+      }
+      if (!$('detailDrawer')?.hidden && !state.sharedMode) renderDrawer(trip, false);
+    }
+
+    if (!data.is_shared) {
+      toast("已關閉分享");
+      return;
+    }
+
+    const shareUrl = getShareUrl(data.share_token);
+    if (!shareUrl) {
+      toast("分享已開啟；請在正式 HTTP(S) 網址查看分享連結");
+      return;
+    }
+    await copyText(shareUrl, "分享已開啟，連結已複製");
+  } catch (error) {
+    console.error("[toggleTripSharing]", error);
+    toast(`分享設定失敗：${error.message || "未知錯誤"}`);
+  }
+}
+
 function renderDrawer(trip, sharedMode) {
   const cover = getCoverUrl(trip);
   const shareUrl = getShareUrl(trip.share_token);
@@ -1411,6 +1475,11 @@ function renderDrawer(trip, sharedMode) {
       </label>
     `
     : "";
+  const shareButton = !sharedMode && trip.is_shared
+    ? shareUrl
+      ? `<button class="btn btn-soft" id="copyShareBtn">複製分享連結</button>`
+      : `<button class="btn btn-soft" id="repairShareBtn">重新建立分享連結</button>`
+    : "";
 
   $("drawerTitle").textContent = trip.title || trip.location_name;
   $("drawerBody").innerHTML = `
@@ -1425,20 +1494,21 @@ function renderDrawer(trip, sharedMode) {
     ${trip.diary ? `<div class="diary">${escapeHtml(trip.diary)}</div>` : ""}
     <div class="drawer-actions">
       ${!sharedMode ? `<button class="btn btn-primary" id="editTripBtn">編輯</button>` : ""}
-      ${!sharedMode && trip.is_shared && shareUrl ? `<button class="btn btn-soft" id="copyShareBtn">複製分享連結</button>` : ""}
+      ${shareButton}
       ${photoButtons}
     </div>
     ${guestUpload}
     ${!sharedMode && trip.is_shared
       ? shareUrl
         ? `<p class="trip-meta">分享連結：${escapeHtml(shareUrl)}</p>`
-        : `<p class="trip-meta">請使用 HTTP(S) 網址開啟網站後再建立分享連結。</p>`
+        : `<p class="trip-meta">這趟旅程缺少分享 token，請重新建立分享連結。</p>`
       : ""}
   `;
 
   $("detailDrawer").hidden = false;
   $("editTripBtn")?.addEventListener("click", () => openTripDialog(trip));
   $("copyShareBtn")?.addEventListener("click", () => copyText(shareUrl));
+  $("repairShareBtn")?.addEventListener("click", () => toggleTripSharing(trip, true));
   $("downloadPhotoBtn")?.addEventListener("click", () => downloadCover(trip, sharedMode));
   $("guestPhotoInput")?.addEventListener("change", (event) => uploadGuestPhoto(event, trip.share_token));
 }
@@ -1802,6 +1872,16 @@ async function handlePhotoInput(event) {
 async function saveTrip(event) {
   event.preventDefault();
   const trip = state.editingTrip;
+  const isShared = $("sharedInput").checked;
+  let shareToken = trip?.share_token || null;
+  if (isShared && !shareToken) {
+    try {
+      shareToken = createShareToken();
+    } catch (error) {
+      console.error("[saveTrip.shareToken]", error);
+      return toast(error.message || "無法建立安全分享連結");
+    }
+  }
   const payload = {
     title: $("titleInput").value.trim() || null,
     location_name: $("locationInput").value.trim(),
@@ -1811,7 +1891,8 @@ async function saveTrip(event) {
     mood: $("moodInput").value || null,
     diary: $("diaryInput").value.trim() || null,
     tags: parseTags($("tagsInput").value),
-    is_shared: $("sharedInput").checked,
+    is_shared: isShared,
+    share_token: shareToken,
     can_download: $("downloadInput").checked,
     can_guest_upload: $("guestUploadInput").checked,
     updated_at: new Date().toISOString()
@@ -1881,19 +1962,25 @@ async function saveLegacyTrip(trip, payload) {
     date_start: payload.travel_date,
     // The legacy form only edits the start date, so preserve an existing end date.
     date_end: trip?.date_end || payload.travel_date,
-    is_shared: payload.is_shared
+    is_shared: payload.is_shared,
+    share_token: payload.share_token
   };
   try {
     let savedId = trip?.id;
     if (trip) {
-      const { error } = await client.from("trips").update(legacyPayload).eq("id", trip.id);
+      const { data, error } = await client
+        .from("trips")
+        .update(legacyPayload)
+        .eq("id", trip.id)
+        .select("id,is_shared,share_token")
+        .maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error("旅程沒有成功更新，請重新整理後再試");
     } else {
       const { data, error } = await client.from("trips").insert({
         ...legacyPayload,
         user_id: state.user.id,
-        photo_count: 0,
-        share_token: crypto.randomUUID()
+        photo_count: 0
       }).select("id").single();
       if (error) throw error;
       savedId = data?.id;
@@ -2071,13 +2158,14 @@ async function uploadGuestPhoto(event, shareToken) {
   await loadSharedTrip(shareToken);
 }
 
-async function copyText(text) {
+async function copyText(text, successMessage = "分享連結已複製") {
+  if (!text) return toast("目前沒有可複製的分享連結");
   try {
     await navigator.clipboard.writeText(text);
-    toast("分享連結已複製");
+    toast(successMessage);
   } catch (error) {
     console.error("[copyText]", error);
-    toast("無法自動複製，請手動複製連結");
+    toast(`${successMessage.replace("已複製", "已開啟，但無法自動複製")}，請手動複製連結`);
   }
 }
 
