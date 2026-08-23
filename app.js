@@ -7,35 +7,20 @@ const authRedirectUrl = cfg.AUTH_REDIRECT_URL || new URL("./", window.location.h
 const state = {
   user: null,
   trips: [],
-  diaries: [],
   photoUrls: new Map(),
   markers: new Map(),
   editingTrip: null,
-  selectedPhoto: null,
-  photoPreviewUrl: null,
+  selectedPhotos: [],
+  photoPreviewUrls: [],
   pendingEmail: "",
   resendTimer: null,
   sharedMode: false,
-  sharedTrip: null,
-  diaryLoadError: "",
-  schemaMode: "modern",
-  storageBucket: bucket,
-  viewerPhotos: [],
-  viewerIndex: 0,
-  locationResults: [],
-  stopLocationResults: [],
-  stopSchemaAvailable: false,
-  stopSchemaError: "",
-  selectedStopId: null
+  sharedTrip: null
 };
 
 const $ = (id) => document.getElementById(id);
 
 let map;
-let detailMap;
-let detailMarker;
-let detailStopMarkers = [];
-let detailRouteLine;
 
 boot();
 
@@ -82,75 +67,13 @@ function bindEvents() {
   $("signUpBtn").addEventListener("click", signUp);
   setupResendButton();
   $("signOutBtn").addEventListener("click", signOut);
-  $("homeDiaryBtn").addEventListener("click", openDiaryLibrary);
-  $("homeNewTripBtn").addEventListener("click", () => openTripDialog());
+  $("newTripBtn").addEventListener("click", () => openTripDialog());
   $("closeDialogBtn").addEventListener("click", closeTripDialog);
   $("closeDrawerBtn").addEventListener("click", closeDrawer);
-  $("backToTripsBtn").addEventListener("click", closeTripDetail);
-  $("detailEditBtn").addEventListener("click", () => {
-    if (state.editingTrip) openTripDialog(state.editingTrip);
-  });
-  $("detailEditExpensesBtn").addEventListener("click", () => {
-    if (state.editingTrip) openTripDialog(state.editingTrip);
-  });
-  $("detailDownloadBtn").addEventListener("click", () => {
-    if (state.editingTrip) downloadCover(state.editingTrip, state.sharedMode);
-  });
-  $("photoViewerCloseBtn").addEventListener("click", closePhotoViewer);
-  $("photoViewerPrevBtn").addEventListener("click", () => changePhotoViewer(-1));
-  $("photoViewerNextBtn").addEventListener("click", () => changePhotoViewer(1));
-  $("photoViewerDownloadBtn").addEventListener("click", downloadViewerPhoto);
-  ["detailRecentPhotos", "detailAllPhotos"].forEach((id) => {
-    const container = $(id);
-    container.addEventListener("click", handleDetailPhotoClick);
-    container.addEventListener("keydown", handleDetailPhotoKeydown);
-  });
-  document.querySelectorAll("[data-detail-tab]").forEach((button) => {
-    button.addEventListener("click", () => setDetailTab(button.dataset.detailTab));
-  });
-  $("detailAddStopBtn").addEventListener("click", openStopDialog);
-  $("closeStopDialogBtn").addEventListener("click", closeStopDialog);
-  $("cancelStopDialogBtn").addEventListener("click", closeStopDialog);
-  $("stopForm").addEventListener("submit", saveStop);
-  $("searchStopLocationBtn").addEventListener("click", searchStopLocation);
-  $("pickStopOnMapBtn").addEventListener("click", pickStopOnMap);
   $("tripForm").addEventListener("submit", saveTrip);
   $("deleteTripBtn").addEventListener("click", deleteCurrentTrip);
   $("photoInput").addEventListener("change", handlePhotoInput);
-  $("searchLocationBtn").addEventListener("click", searchLocation);
-  $("locationInput").addEventListener("keydown", (event) => {
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-    searchLocation();
-  });
   $("searchInput").addEventListener("input", renderTrips);
-  document.addEventListener("click", closeTripCardMenus);
-  document.querySelectorAll("[data-mobile-nav]").forEach((button) => {
-    button.addEventListener("click", () => handleMobileNavigation(button.dataset.mobileNav));
-  });
-  $("mobileAddBtn").addEventListener("click", () => openActionSheet("quickActionSheet"));
-  $("closeQuickActionBtn").addEventListener("click", () => $("quickActionSheet").close());
-  $("closeMoreMenuBtn").addEventListener("click", () => $("moreMenuSheet").close());
-  $("closeFootprintBtn").addEventListener("click", () => $("footprintSheet").close());
-  $("closeStatsBtn").addEventListener("click", () => $("statsSheet").close());
-  $("closeDiaryLibraryBtn").addEventListener("click", () => $("diaryLibrarySheet").close());
-  $("diaryLibrary").addEventListener("click", handleDiaryLibraryClick);
-  $("closeSettingsBtn").addEventListener("click", () => $("settingsSheet").close());
-  $("footprintMapBtn").addEventListener("click", () => {
-    $("footprintSheet").close();
-    handleMobileNavigation("map");
-  });
-  $("memoryOpenBtn").addEventListener("click", () => {
-    const tripId = $("memoryOpenBtn").dataset.tripId;
-    if (tripId) openTrip(tripId);
-  });
-  $("mobileSignOutBtn").addEventListener("click", signOut);
-  document.querySelectorAll("[data-quick-action]").forEach((button) => {
-    button.addEventListener("click", () => handleQuickAction(button.dataset.quickAction));
-  });
-  document.querySelectorAll("[data-more-action]").forEach((button) => {
-    button.addEventListener("click", () => handleMoreAction(button.dataset.moreAction));
-  });
 }
 
 function setupResendButton() {
@@ -270,532 +193,35 @@ async function resendVerificationEmail() {
 async function signOut() {
   const { error } = await client.auth.signOut();
   if (error) return toast(error.message);
-  closeActionSheets();
   state.trips = [];
-  state.diaries = [];
   state.photoUrls.clear();
   refreshMarkers();
   renderTrips();
   closeDrawer();
-  closeTripDetail();
 }
 
 function setSessionUI() {
   const signedIn = !!state.user;
   $("authScreen").hidden = signedIn;
   $("appShell").hidden = !signedIn;
-  if (!signedIn) closeTripDetail();
+  $("newTripBtn").hidden = !signedIn;
   $("signOutBtn").hidden = !signedIn;
-  $("mobileBottomNav").hidden = !signedIn || state.sharedMode;
-  $("settingsEmail").textContent = state.user?.email || "登入帳號";
   $("sessionStatus").textContent = signedIn ? `私人雲端 · ${state.user.email}` : "私人雲端";
   if (signedIn) setTimeout(() => map.invalidateSize(), 80);
 }
 
-function handleMobileNavigation(destination) {
-  if (destination === "home") {
-    closeTripDetail();
-    closeDrawer();
-    setMobileNavActive("home");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    return;
-  }
-
-  if (destination === "map") {
-    closeTripDetail();
-    closeDrawer();
-    setMobileNavActive("map");
-    $("map").scrollIntoView({ behavior: "smooth", block: "start" });
-    setTimeout(() => map?.invalidateSize(), 180);
-    return;
-  }
-
-  if (destination === "diary") {
-    setMobileNavActive("diary");
-    openDiaryLibrary();
-    return;
-  }
-
-  if (destination === "more") {
-    setMobileNavActive("more");
-    openActionSheet("moreMenuSheet");
-  }
-}
-
-function setMobileNavActive(destination) {
-  document.querySelectorAll("[data-mobile-nav]").forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.mobileNav === destination);
-  });
-}
-
-function openActionSheet(id) {
-  const sheet = $(id);
-  if (!sheet?.open) sheet?.showModal();
-}
-
-function closeActionSheets() {
-  ["quickActionSheet", "moreMenuSheet", "footprintSheet", "statsSheet", "diaryLibrarySheet", "settingsSheet"].forEach((id) => {
-    const sheet = $(id);
-    if (sheet?.open) sheet.close();
-  });
-}
-
-function handleQuickAction(action) {
-  $("quickActionSheet").close();
-
-  if (action === "trip") {
-    openTripDialog();
-    return;
-  }
-
-  const recent = getRecentTrip();
-  if (action === "photo") {
-    if (!recent || state.schemaMode === "legacy") {
-      openTripDialog();
-      setTimeout(() => $("photoInput").focus(), 80);
-      if (state.schemaMode === "legacy") toast("舊版資料請用新旅程流程加入照片");
-      return;
-    }
-    openTripDialog(recent);
-    setTimeout(() => $("photoInput").focus(), 80);
-    return;
-  }
-
-  if (action === "diary") {
-    if (!recent) return openTripDialog();
-    if (state.schemaMode === "legacy") {
-      openLatestTripTab("diary");
-      toast("舊版日記目前可閱讀，編輯入口會在日記模組接入");
-      return;
-    }
-    openTripDialog(recent);
-    setTimeout(() => $("diaryInput").focus(), 80);
-  }
-}
-
-function handleMoreAction(action) {
-  $("moreMenuSheet").close();
-
-  if (action === "photos" || action === "timeline") {
-    setMobileNavActive("more");
-    openLatestTripTab("photos");
-    return;
-  }
-
-  if (action === "footprints") {
-    openFootprints();
-    return;
-  }
-
-  if (action === "stats") {
-    renderTravelStats();
-    openActionSheet("statsSheet");
-    return;
-  }
-
-  if (action === "settings") {
-    $("settingsEmail").textContent = state.user?.email || "登入帳號";
-    openActionSheet("settingsSheet");
-    return;
-  }
-
-  if (action === "diary") {
-    openDiaryLibrary();
-  }
-}
-
-function getRecentTrip() {
-  return [...state.trips].sort(compareTripsByDate)[0] || null;
-}
-
-function openFootprints() {
-  closeTripDetail();
-  closeDrawer();
-  renderFootprints();
-  setMobileNavActive("more");
-  openActionSheet("footprintSheet");
-}
-
-function renderFootprints() {
-  const trips = state.trips;
-  const countries = [...new Set(trips.map((trip) => getTripCountry(trip)).filter(Boolean))];
-  const cities = [...new Set(trips.flatMap((trip) => getTripLocations(trip)).filter((place) => place !== "未記錄地點"))];
-  const days = trips.reduce((sum, trip) => sum + getTripDayCount(trip), 0);
-  $("footprintStats").innerHTML = [
-    ["🌍", countries.length, "個國家"],
-    ["🏙️", cities.length, "個城市"],
-    ["🧳", trips.length, "趟旅行"],
-    ["📅", days, "個旅行日"]
-  ].map(([icon, value, label]) => `<div class="footprint-stat"><span>${icon}</span><strong>${value}</strong><small>${label}</small></div>`).join("");
-
-  const grouped = new Map();
-  [...trips].sort(compareTripsByDate).forEach((trip) => {
-    const year = getTripYear(trip);
-    if (!grouped.has(year)) grouped.set(year, []);
-    grouped.get(year).push(trip);
-  });
-  $("footprintYears").innerHTML = [...grouped.entries()].map(([year, yearTrips]) => `
-    <section class="footprint-year">
-      <div class="footprint-year-head"><h3>${escapeHtml(year)}</h3><span>${yearTrips.length} 趟</span></div>
-      <div class="footprint-trip-list">
-        ${yearTrips.map((trip) => `<button type="button" data-footprint-trip="${escapeHtml(trip.id)}"><span>${escapeHtml(trip.mood?.split(" ")[0] || "📍")}</span><strong>${escapeHtml(trip.title || trip.location_name || "未命名旅程")}</strong><small>${escapeHtml(trip.location_name || "未記錄地點")}</small></button>`).join("")}
-      </div>
-    </section>
-  `).join("") || `<div class="detail-empty">新增第一趟旅行後，這裡會留下你的足跡。</div>`;
-  $("footprintYears").querySelectorAll("[data-footprint-trip]").forEach((button) => {
-    button.addEventListener("click", () => {
-      $("footprintSheet").close();
-      openTrip(button.dataset.footprintTrip);
-    });
-  });
-}
-
-function getTripCountry(trip) {
-  return String(trip?.country || trip?.country_name || "").trim();
-}
-
-function getTripDayCount(trip) {
-  const start = trip?.travel_date || trip?.date_start;
-  const end = trip?.travel_date_end || trip?.date_end || start;
-  if (!start) return 0;
-  const startDate = new Date(`${start}T00:00:00`);
-  const endDate = new Date(`${end}T00:00:00`);
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return 0;
-  return Math.max(1, Math.round((endDate - startDate) / 86400000) + 1);
-}
-
-function renderMemoryOfToday() {
-  const section = $("memorySection");
-  if (state.sharedMode) {
-    section.hidden = true;
-    return;
-  }
-  const memory = findMemoryOfToday();
-  if (!memory) {
-    section.hidden = true;
-    return;
-  }
-
-  const image = $("memoryImage");
-  const placeholder = $("memoryPlaceholder");
-  const cover = getCoverUrl(memory.trip);
-  image.hidden = !cover;
-  image.src = cover || "";
-  placeholder.hidden = !!cover;
-  $("memoryDate").textContent = `${memory.year} 年的今天`;
-  $("memoryTitle").textContent = memory.trip.title || memory.trip.location_name || "那一天的旅行";
-  $("memoryMeta").textContent = [memory.dateLabel, memory.trip.location_name, `${getTripPhotos(memory.trip).length} 張照片`].filter(Boolean).join(" · ");
-  $("memoryText").textContent = memory.diary || "那一天留下的照片，正在等你重新翻開。";
-  $("memoryOpenBtn").dataset.tripId = memory.trip.id;
-  section.hidden = false;
-}
-
-function findMemoryOfToday() {
-  const today = new Date();
-  const month = today.getMonth() + 1;
-  const day = today.getDate();
-  const currentYear = today.getFullYear();
-  const candidates = [];
-  state.trips.forEach((trip) => {
-    const dateText = trip.travel_date || trip.date_start || "";
-    const match = String(dateText).match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (!match || Number(match[1]) >= currentYear) return;
-    if (Number(match[2]) !== month || Number(match[3]) !== day) return;
-    const diary = getTripDiaryRecords(trip)[0];
-    candidates.push({
-      trip,
-      year: Number(match[1]),
-      dateLabel: `${match[1]}.${match[2]}.${match[3]}`,
-      diary: diary?.content?.trim() || trip.diary?.trim() || ""
-    });
-  });
-  return candidates.sort((a, b) => b.year - a.year)[0] || null;
-}
-
-function renderTravelStats() {
-  const trips = state.trips;
-  const photos = trips.reduce((sum, trip) => sum + getTripPhotos(trip).length, 0);
-  const diaries = trips.reduce((sum, trip) => sum + getTripDiaryRecords(trip).length, 0);
-  const days = trips.reduce((sum, trip) => sum + getTripDayCount(trip), 0);
-  const cities = [...new Set(trips.flatMap((trip) => getTripLocations(trip)).filter((place) => place !== "未記錄地點"))];
-  const countries = [...new Set(trips.map((trip) => getTripCountry(trip)).filter(Boolean))];
-  const moodCounts = new Map();
-  trips.forEach((trip) => {
-    const mood = String(trip.mood || "").split(" ")[0];
-    if (mood) moodCounts.set(mood, (moodCounts.get(mood) || 0) + 1);
-  });
-  const favoriteMood = [...moodCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
-  const cityCounts = new Map();
-  trips.forEach((trip) => getTripLocations(trip).filter((place) => place !== "未記錄地點").forEach((place) => cityCounts.set(place, (cityCounts.get(place) || 0) + 1)));
-  const favoriteCity = [...cityCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
-  const mostPhotos = [...trips].sort((a, b) => getTripPhotos(b).length - getTripPhotos(a).length)[0];
-  const longestTrip = [...trips].sort((a, b) => getTripDayCount(b) - getTripDayCount(a))[0];
-  const currentYear = String(new Date().getFullYear());
-  const currentYearTrips = trips.filter((trip) => getTripYear(trip) === currentYear);
-  $("travelStatsBody").innerHTML = `
-    <div class="travel-stats-year">${escapeHtml(currentYear)} MY TRAVEL</div>
-    <div class="travel-stat-grid">
-      ${[["🧳", trips.length, "趟旅行"], ["📅", days, "旅行日"], ["📷", photos, "張照片"], ["🏙️", cities.length, "個城市"], ["📝", diaries, "篇日記"], ["🌍", countries.length, "個國家"]].map(([icon, value, label]) => `<div class="travel-stat-card"><span>${icon}</span><strong>${value.toLocaleString()}</strong><small>${label}</small></div>`).join("")}
-    </div>
-    <div class="travel-insights">
-      <h3>${currentYear} 的旅行印記</h3>
-      <div><span>今年旅行</span><strong>${currentYearTrips.length} 趟</strong></div>
-      <div><span>最常去</span><strong>${escapeHtml(favoriteCity)}</strong></div>
-      <div><span>照片最多</span><strong>${escapeHtml(mostPhotos?.title || mostPhotos?.location_name || "—")}</strong></div>
-      <div><span>旅行最久</span><strong>${escapeHtml(longestTrip ? `${longestTrip.title || longestTrip.location_name || "未命名"} · ${getTripDayCount(longestTrip)} 天` : "—")}</strong></div>
-      <div><span>最常出現的心情</span><strong>${escapeHtml(favoriteMood)}</strong></div>
-    </div>
-  `;
-}
-
-function openLatestTripTab(tabName) {
-  const recent = getRecentTrip();
-  if (!recent) return toast("目前還沒有旅程");
-  closeActionSheets();
-  openTrip(recent.id);
-  setDetailTab(tabName);
-}
-
-function openDiaryLibrary() {
-  closeTripDetail();
-  closeDrawer();
-  renderDiaryLibrary();
-  openActionSheet("diaryLibrarySheet");
-}
-
-function getAllDiaryRecords() {
-  const records = [...state.diaries];
-  const linkedTripIds = new Set(records.map((diary) => String(diary.trip_id || "")));
-
-  state.trips.forEach((trip) => {
-    if (!trip?.diary || linkedTripIds.has(String(trip.id))) return;
-    records.push({
-      id: `trip-diary-${trip.id}`,
-      title: trip.title || trip.location_name || "旅行日記",
-      content: trip.diary,
-      diary_date: trip.travel_date || trip.date_start || "",
-      mood: trip.mood || "",
-      trip_id: trip.id
-    });
-  });
-
-  return records;
-}
-
-function renderDiaryLibrary() {
-  const list = $("diaryLibrary");
-  if (!list) return;
-
-  const diaries = getAllDiaryRecords().sort((a, b) =>
-    String(b.diary_date || b.created_at || "").localeCompare(String(a.diary_date || a.created_at || ""))
-  );
-  list.innerHTML = diaries.length
-    ? diaries.map((diary) => {
-      const trip = state.trips.find((item) => String(item.id) === String(diary.trip_id));
-      const tripLabel = trip?.title || trip?.location_name || "未關聯旅程";
-      return `
-        <article class="diary-library-entry">
-          <div class="diary-library-entry-head">
-            <div>
-              <p>${escapeHtml(diary.diary_date || "未記錄日期")}</p>
-              <h3>${escapeHtml(diary.title || "旅行日記")}</h3>
-            </div>
-            <span>${escapeHtml(diary.mood || "📝")}</span>
-          </div>
-          <p class="diary-library-trip">${escapeHtml(tripLabel)}</p>
-          <div class="diary-library-content">${escapeHtml(diary.content || "（無內容）")}</div>
-          ${trip ? `<button class="text-action diary-library-open" type="button" data-diary-trip-id="${escapeHtml(trip.id)}">查看這趟旅程 →</button>` : ""}
-        </article>
-      `;
-    }).join("")
-    : `<div class="detail-empty">${state.diaryLoadError ? `日記載入失敗：${escapeHtml(state.diaryLoadError)}` : "目前沒有可顯示的日記。"}</div>`;
-}
-
-function handleDiaryLibraryClick(event) {
-  const button = event.target.closest("[data-diary-trip-id]");
-  if (!button) return;
-  const trip = state.trips.find((item) => String(item.id) === String(button.dataset.diaryTripId));
-  if (!trip) return;
-  $("diaryLibrarySheet").close();
-  openTrip(trip.id);
-  setDetailTab("diary");
-}
-
 async function loadTrips() {
-  const modernResult = await client
+  const { data, error } = await client
     .from("trips")
     .select("*, trip_photos(*)")
     .order("travel_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 
-  const hasLegacyShape = (modernResult.data || []).some((trip) =>
-    trip.name && !trip.location_name && (trip.date_start || trip.photos_meta || trip.expenses)
-  );
-  if (!modernResult.error && !hasLegacyShape) {
-    state.schemaMode = "modern";
-    state.storageBucket = bucket;
-    state.trips = modernResult.data || [];
-    state.diaries = [];
-    // Keep the original standalone diary records visible after the UI refactor.
-    // The modern trips query does not include the separate diaries table.
-    await loadStandaloneDiaries();
-  } else {
-    // The original app stores photos_meta on trips and diary entries separately.
-    // Keep that data readable while the database remains unchanged.
-    const legacyResult = await client
-      .from("trips")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (legacyResult.error) return toast(legacyResult.error.message);
-    state.schemaMode = "legacy";
-    state.storageBucket = bucket;
-    state.trips = (legacyResult.data || []).map(normalizeLegacyTrip);
-    await loadStandaloneDiaries();
-  }
-
-  await loadTripStops();
+  if (error) return toast(error.message);
+  state.trips = data || [];
   await hydratePhotoUrls();
   renderTrips();
   refreshMarkers();
-}
-
-async function loadTripStops() {
-  state.stopSchemaAvailable = false;
-  state.stopSchemaError = "";
-  state.trips.forEach((trip) => { trip.trip_days = []; });
-  // Stops are linked by trip id, so they work with both the modern trip
-  // shape and the legacy trip shape used by older records.
-  if (!state.trips.length) return;
-
-  // Query the two tables separately. This avoids depending on PostgREST's
-  // relationship cache immediately after the additive migration is run.
-  const { data: days, error: daysError } = await client
-    .from("trip_days")
-    .select("*")
-    .in("trip_id", state.trips.map((trip) => trip.id))
-    .order("day_number", { ascending: true })
-    .order("sort_order", { ascending: true });
-
-  if (daysError) {
-    if (daysError.code === "PGRST205" || daysError.code === "42P01") {
-      state.stopSchemaError = "找不到 trip_days 資料表";
-      return;
-    }
-    state.stopSchemaError = daysError.code || daysError.message || "trip_days 讀取失敗";
-    console.error("[loadTripStops.days]", daysError);
-    return;
-  }
-
-  const dayRows = days || [];
-  const dayIds = dayRows.map((day) => day.id).filter(Boolean);
-  let stopRows = [];
-  if (dayIds.length) {
-    const { data: stops, error: stopsError } = await client
-      .from("trip_stops")
-      .select("*")
-      .in("day_id", dayIds)
-      .order("sort_order", { ascending: true });
-
-    if (stopsError) {
-      if (stopsError.code === "PGRST205" || stopsError.code === "42P01") {
-        state.stopSchemaError = "找不到 trip_stops 資料表";
-        return;
-      }
-      state.stopSchemaError = stopsError.code || stopsError.message || "trip_stops 讀取失敗";
-      console.error("[loadTripStops.stops]", stopsError);
-      return;
-    }
-    stopRows = stops || [];
-  }
-
-  state.stopSchemaAvailable = true;
-  state.trips.forEach((trip) => {
-    trip.trip_days = dayRows
-      .filter((day) => String(day.trip_id) === String(trip.id))
-      .map((day) => ({
-        ...day,
-        trip_stops: stopRows
-          .filter((stop) => String(stop.day_id) === String(day.id))
-          .sort(compareStops)
-      }));
-  });
-}
-
-function compareStops(a, b) {
-  const orderDifference = (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
-  if (orderDifference) return orderDifference;
-  return String(a.arrival_time || "99:99").localeCompare(String(b.arrival_time || "99:99"));
-}
-
-async function loadStandaloneDiaries() {
-  state.diaryLoadError = "";
-  let { data, error } = await client
-    .from("diaries")
-    .select("*")
-    .order("diary_date", { ascending: false });
-
-  // Keep compatibility with older diary tables that may not expose diary_date
-  // through the current PostgREST schema cache.
-  if (error) {
-    const fallback = await client.from("diaries").select("*");
-    if (!fallback.error) {
-      data = fallback.data;
-      error = null;
-    }
-  }
-
-  if (error) {
-    if (error.code === "PGRST205" || error.code === "42P01") {
-      state.diaries = [];
-      state.diaryLoadError = "找不到 diaries 資料表";
-      return;
-    }
-    console.error("[loadStandaloneDiaries]", error);
-    state.diaries = [];
-    state.diaryLoadError = error.message || error.code || "未知錯誤";
-    return;
-  }
-  // The original app relied on Supabase RLS here. Keep that behavior so
-  // older rows are not hidden when the ownership column has a legacy name.
-  state.diaries = data || [];
-  state.trips.forEach((trip) => {
-    trip._diaries = state.diaries.filter((diary) => String(diary.trip_id) === String(trip.id));
-  });
-}
-
-function normalizeLegacyTrip(trip) {
-  const photos = parseLegacyPhotos(trip.photos_meta).map((photo, index) => ({
-    id: photo.id || `legacy-${trip.id}-${index}`,
-    storage_path: photo.path,
-    original_name: photo.original_name || photo.name || photo.path.split("/").pop() || `照片 ${index + 1}`,
-    caption: photo.caption || "",
-    signed_url: photo.signed_url || ""
-  }));
-  return {
-    ...trip,
-    title: trip.title ?? trip.name ?? null,
-    location_name: trip.location_name ?? trip.location ?? "",
-    travel_date: trip.travel_date ?? trip.date_start ?? null,
-    travel_date_end: trip.travel_date_end ?? trip.date_end ?? null,
-    mood: trip.mood ?? null,
-    tags: Array.isArray(trip.tags) ? trip.tags : [],
-    cover_path: trip.cover_path || photos[0]?.storage_path || null,
-    trip_photos: photos,
-    _legacy: true
-  };
-}
-
-function parseLegacyPhotos(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) return value.filter((photo) => photo && typeof photo.path === "string");
-  if (typeof value !== "string") return [];
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed.filter((photo) => photo && typeof photo.path === "string") : [];
-  } catch (error) {
-    console.error("[parseLegacyPhotos]", error);
-    return [];
-  }
 }
 
 async function hydratePhotoUrls() {
@@ -805,7 +231,7 @@ async function hydratePhotoUrls() {
   ))];
   if (!paths.length) return;
 
-  const { data, error } = await client.storage.from(state.storageBucket).createSignedUrls(paths, 60 * 60);
+  const { data, error } = await client.storage.from(bucket).createSignedUrls(paths, 60 * 60);
   if (error) {
     console.error("[hydratePhotoUrls]", error);
     return;
@@ -819,208 +245,40 @@ async function hydratePhotoUrls() {
 function renderTrips() {
   const list = $("tripList");
   const query = $("searchInput").value.trim().toLowerCase();
-  const filtered = state.trips.filter((trip) => tripMatchesQuery(trip, query));
-  const sorted = [...filtered].sort(compareTripsByDate);
-  const recent = sorted[0];
-
-  renderMemoryOfToday();
+  const filtered = state.trips.filter((trip) => {
+    const haystack = [trip.title, trip.location_name, trip.travel_date, trip.mood, trip.diary, (trip.tags || []).join(" ")]
+      .join(" ")
+      .toLowerCase();
+    return !query || haystack.includes(query);
+  });
 
   $("placeCount").textContent = state.trips.length;
   $("photoCount").textContent = state.trips.reduce((sum, trip) => sum + (trip.trip_photos?.length || 0), 0);
 
   if (!filtered.length) {
-    $("recentTrip").innerHTML = `<div class="empty recent-empty">${query ? "找不到符合條件的旅程。" : "還沒有最近旅程。"}</div>`;
-    list.innerHTML = `<div class="empty">${query ? "請換個關鍵字再試一次。" : "從上方「＋ 新增旅程」開始，先記下下一段旅途。"}</div>`;
+    list.innerHTML = `<div class="empty">還沒有旅途。按右上角「新增旅途」，先放進第一張照片。</div>`;
     return;
   }
 
-  $("recentTrip").innerHTML = renderRecentTrip(recent);
-  bindTripCards($("recentTrip"));
-
-  const grouped = new Map();
-  sorted.forEach((trip) => {
-    const year = getTripYear(trip);
-    if (!grouped.has(year)) grouped.set(year, []);
-    grouped.get(year).push(trip);
-  });
-
-  list.innerHTML = [...grouped.entries()].map(([year, trips]) => `
-    <section class="trip-year-group">
-      <div class="trip-year-heading"><h3>${escapeHtml(year)}</h3><span>${trips.length} 趟</span></div>
-      <div class="trip-card-grid">${trips.map(renderTripCard).join("")}</div>
-    </section>
-  `).join("");
-
-  bindTripCards(list);
-}
-
-function tripMatchesQuery(trip, query) {
-  if (!query) return true;
-  const diaryText = getTripDiaryRecords(trip)
-    .map((diary) => [diary.title, diary.content].join(" "))
-    .join(" ");
-  const haystack = [
-    trip.title,
-    trip.location_name,
-    trip.location,
-    trip.travel_date,
-    trip.date_start,
-    trip.travel_date_end,
-    trip.date_end,
-    trip.mood,
-    trip.diary,
-    diaryText,
-    (trip.tags || []).join(" ")
-  ].join(" ").toLowerCase();
-  return haystack.includes(query);
-}
-
-function compareTripsByDate(a, b) {
-  const aValue = getTripDateValue(a);
-  const bValue = getTripDateValue(b);
-  return bValue - aValue;
-}
-
-function getTripDateValue(trip) {
-  const value = trip?.travel_date || trip?.date_start || trip?.created_at || "";
-  const time = new Date(value).getTime();
-  return Number.isFinite(time) ? time : 0;
-}
-
-function getTripYear(trip) {
-  const value = trip?.travel_date || trip?.date_start || trip?.created_at || "未分類";
-  const match = String(value).match(/^(\d{4})/);
-  return match ? match[1] : "未分類";
-}
-
-function renderRecentTrip(trip) {
-  if (!trip) return `<div class="empty recent-empty">還沒有最近旅程。</div>`;
-  const cover = getCoverUrl(trip);
-  const photos = getTripPhotos(trip);
-  const diaries = getTripDiaryRecords(trip);
-  const start = trip.travel_date || trip.date_start || "";
-  const end = trip.travel_date_end || trip.date_end || start;
-  const title = trip.title || trip.location_name || "未命名旅程";
-  const location = trip.location_name || trip.location || "未記錄地點";
-  return `
-    <article class="recent-trip-card" data-trip-id="${escapeHtml(trip.id)}" tabindex="0" role="button" aria-label="回顧${escapeHtml(title)}">
-      <div class="recent-trip-media">
-        ${cover ? `<img src="${escapeHtml(cover)}" alt="${escapeHtml(location)}" fetchpriority="high">` : `<div class="trip-placeholder">📍</div>`}
-        <span class="recent-trip-badge">${trip.is_shared ? "已分享" : "私人"}</span>
-        ${renderTripCardMenu(trip)}
-      </div>
-      <div class="recent-trip-body">
-        <div>
-          <p class="section-kicker">最近一次旅行</p>
-          <h3>${escapeHtml(title)}</h3>
-          <p class="recent-trip-meta">${escapeHtml(formatDateRange(start, end))} · ${escapeHtml(location)}</p>
-          <p class="recent-trip-stats">${formatTripDays(start, end)} · ${photos.length} 張照片 · ${diaries.length} 篇日記</p>
+  list.innerHTML = filtered.map((trip) => {
+    const cover = getCoverUrl(trip);
+    return `
+      <article class="trip-card" data-trip-id="${trip.id}">
+        ${cover ? `<img src="${escapeHtml(cover)}" alt="${escapeHtml(trip.location_name)}">` : `<div class="trip-placeholder">📍</div>`}
+        <div class="trip-card-body">
+          <div class="trip-card-title">
+            <span>${escapeHtml(trip.title || trip.location_name)}</span>
+            <span>${escapeHtml((trip.mood || "").split(" ")[0])}</span>
+          </div>
+          <div class="trip-meta">${escapeHtml(trip.location_name)}${trip.travel_date ? ` · ${formatDate(trip.travel_date)}` : ""}</div>
         </div>
-        <span class="recent-trip-link">回顧 <span aria-hidden="true">→</span></span>
-      </div>
-    </article>
-  `;
-}
+      </article>
+    `;
+  }).join("");
 
-function renderTripCard(trip) {
-  const cover = getCoverUrl(trip);
-  const photos = getTripPhotos(trip);
-  const diaries = getTripDiaryRecords(trip);
-  const start = trip.travel_date || trip.date_start || "";
-  const end = trip.travel_date_end || trip.date_end || start;
-  const title = trip.title || trip.location_name || "未命名旅程";
-  const location = trip.location_name || trip.location || "未記錄地點";
-  return `
-    <article class="trip-card" data-trip-id="${escapeHtml(trip.id)}" tabindex="0" role="button" aria-label="查看${escapeHtml(title)}">
-      <div class="trip-card-media">
-        ${cover ? `<img src="${escapeHtml(cover)}" alt="${escapeHtml(location)}" loading="lazy">` : `<div class="trip-placeholder">📍</div>`}
-        <span class="trip-privacy-dot" title="${trip.is_shared ? "已分享" : "私人旅程"}">${trip.is_shared ? "○" : "•"}</span>
-        ${renderTripCardMenu(trip)}
-      </div>
-      <div class="trip-card-body">
-        <div class="trip-card-title"><span>${escapeHtml(title)}</span></div>
-        <div class="trip-meta">${escapeHtml(location)}</div>
-        <div class="trip-card-date">${escapeHtml(formatDateRange(start, end))}</div>
-        <div class="trip-card-stats"><span>📷 ${photos.length}</span><span>📝 ${diaries.length}</span><span>${escapeHtml(formatTripDays(start, end))}</span></div>
-      </div>
-    </article>
-  `;
-}
-
-function renderTripCardMenu(trip) {
-  if (state.sharedMode) return "";
-  const shareLabel = trip.is_shared
-    ? (trip.share_token ? "複製分享連結" : "修復分享連結")
-    : "開啟分享";
-  return `
-    <div class="trip-card-menu">
-      <button class="trip-card-menu-trigger" type="button" data-trip-menu aria-label="${escapeHtml(trip.title || trip.location_name || "旅程")} 的更多操作" title="更多操作">•••</button>
-      <div class="trip-card-menu-panel" data-trip-menu-panel hidden>
-        <button type="button" data-trip-action="edit">編輯</button>
-        <button type="button" data-trip-action="share">${shareLabel}</button>
-        <button class="is-danger" type="button" data-trip-action="delete">刪除</button>
-      </div>
-    </div>
-  `;
-}
-
-function bindTripCards(container) {
-  container.querySelectorAll("[data-trip-id]").forEach((card) => {
-    const open = () => openTrip(card.dataset.tripId);
-    card.addEventListener("click", open);
-    card.addEventListener("keydown", (event) => {
-      if (event.target.closest("[data-trip-menu]")) return;
-      if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      open();
-    });
-
-    const menu = card.querySelector("[data-trip-menu]");
-    const panel = card.querySelector("[data-trip-menu-panel]");
-    menu?.addEventListener("click", (event) => {
-      event.stopPropagation();
-      closeTripCardMenus(panel);
-      panel.hidden = false;
-    });
-    menu?.addEventListener("keydown", (event) => event.stopPropagation());
-    panel?.addEventListener("click", (event) => {
-      const actionButton = event.target.closest("[data-trip-action]");
-      if (!actionButton) return;
-      event.stopPropagation();
-      handleTripCardAction(card.dataset.tripId, actionButton.dataset.tripAction);
-    });
+  list.querySelectorAll(".trip-card").forEach((card) => {
+    card.addEventListener("click", () => openTrip(card.dataset.tripId));
   });
-}
-
-function closeTripCardMenus(except = null) {
-  document.querySelectorAll("[data-trip-menu-panel]").forEach((panel) => {
-    if (panel !== except) panel.hidden = true;
-  });
-}
-
-function handleTripCardAction(tripId, action) {
-  if (state.sharedMode) return toast("分享檢視不可修改旅程");
-  const trip = state.trips.find((item) => String(item.id) === String(tripId));
-  if (!trip) return;
-  closeTripCardMenus();
-
-  if (action === "edit") {
-    openTripDialog(trip);
-    return;
-  }
-
-  if (action === "share") {
-    if (!trip.is_shared || !trip.share_token) return toggleTripSharing(trip, true);
-    const shareUrl = getShareUrl(trip.share_token);
-    if (!shareUrl) return toast("請使用 HTTP(S) 網址開啟網站後再分享");
-    copyText(shareUrl);
-    return;
-  }
-
-  if (action === "delete") {
-    state.editingTrip = trip;
-    deleteCurrentTrip();
-  }
 }
 
 function refreshMarkers() {
@@ -1029,21 +287,6 @@ function refreshMarkers() {
 
   const points = [];
   state.trips.forEach((trip) => {
-    const stops = getTripStops(trip)
-      .map((stop, index) => ({ ...stop, index, lat: numberOrNull(stop.lat), lng: numberOrNull(stop.lng) }))
-      .filter((stop) => stop.lat !== null && stop.lng !== null);
-
-    if (stops.length) {
-      stops.forEach((stop) => {
-        const marker = L.marker([stop.lat, stop.lng], { icon: makeStopMarkerIcon(stop.index + 1) }).addTo(map);
-        marker.bindPopup(`<strong>${escapeHtml(stop.name)}</strong><br>${escapeHtml(trip.title || trip.location_name || "旅程")}`);
-        marker.on("click", () => openTrip(trip.id));
-        state.markers.set(`${trip.id}:${stop.id}`, marker);
-        points.push([stop.lat, stop.lng]);
-      });
-      return;
-    }
-
     const lat = numberOrNull(trip.lat);
     const lng = numberOrNull(trip.lng);
     if (lat === null || lng === null) return;
@@ -1069,8 +312,6 @@ function makeMarkerIcon(trip) {
 function openTrip(id) {
   const trip = state.trips.find((item) => item.id === id);
   if (!trip) return;
-
-  if (!state.sharedMode) closeDrawer();
   state.editingTrip = trip;
 
   const lat = numberOrNull(trip.lat);
@@ -1079,792 +320,7 @@ function openTrip(id) {
     map.flyTo([lat, lng], 13, { duration: 0.8 });
   }
 
-  if (state.sharedMode) {
-    renderDrawer(trip, true);
-    return;
-  }
-
-  $("appShell").hidden = true;
-  $("tripDetailPage").hidden = false;
-  renderTripDetail(trip);
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-function closeTripDetail() {
-  const detailPage = $("tripDetailPage");
-  if (!detailPage) return;
-  detailPage.hidden = true;
-  $("appShell").hidden = !(state.user || state.sharedMode);
-  state.editingTrip = null;
-  if (map) setTimeout(() => map.invalidateSize(), 80);
-}
-
-function setDetailTab(tabName) {
-  document.querySelectorAll("[data-detail-tab]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.detailTab === tabName);
-  });
-  document.querySelectorAll(".detail-panel").forEach((panel) => {
-    panel.hidden = panel.id !== `detail-panel-${tabName}`;
-  });
-  if (tabName === "map" && state.editingTrip) {
-    renderDetailMap(state.editingTrip);
-  }
-}
-
-function renderTripDetail(trip) {
-  state.selectedStopId = null;
-  const photos = getTripPhotos(trip);
-  const diaries = getTripDiaryRecords(trip);
-  const cover = getCoverUrl(trip);
-  const name = trip.title || trip.location_name || "未命名旅途";
-  const location = trip.location_name || trip.location || "未記錄地點";
-  const dateStart = trip.travel_date || trip.date_start || "";
-  const dateEnd = trip.date_end || trip.travel_date_end || dateStart;
-  const dateLabel = formatDateRange(dateStart, dateEnd);
-  const mood = trip.mood ? trip.mood.split(" ")[0] : "";
-  const tags = Array.isArray(trip.tags) ? trip.tags : [];
-
-  $("detailHeroMedia").innerHTML = cover
-    ? `<img src="${escapeHtml(cover)}" alt="${escapeHtml(location)}" fetchpriority="high">`
-    : `<div class="detail-hero-placeholder">${escapeHtml(mood || "📍")}</div>`;
-  $("detailKicker").textContent = `${location}${trip.country ? ` · ${trip.country}` : ""}`;
-  $("detailName").textContent = name;
-  $("detailHeroMeta").textContent = [dateLabel, mood, ...tags].filter(Boolean).join("  ·  ");
-  $("detailPrivacy").textContent = trip.is_shared ? "已開啟分享" : "私人旅途";
-  $("detailDownloadBtn").hidden = !cover;
-
-  $("detailDays").textContent = formatTripDays(dateStart, dateEnd);
-  $("detailPhotoCount").textContent = photos.length;
-  $("detailDiaryCount").textContent = diaries.length;
-  const locations = getTripLocations(trip);
-  const stops = getTripStops(trip);
-  const routeLocations = stops.length ? stops.map((stop) => stop.name) : locations;
-  $("detailPlaceCount").textContent = stops.length || (locations[0] === "未記錄地點" ? "0" : locations.length);
-  $("detailRoute").innerHTML = routeLocations.map((place, index) => `
-    ${index ? '<span class="detail-route-arrow" aria-hidden="true">→</span>' : ""}
-    <span class="detail-route-stop">${escapeHtml(place)}</span>
-  `).join("");
-  $("detailCoordinates").textContent = numberOrNull(trip.lat) !== null && numberOrNull(trip.lng) !== null
-    ? `${locations.length > 1 ? "主地標座標" : "座標"} ${Number(trip.lat).toFixed(5)}, ${Number(trip.lng).toFixed(5)}`
-    : "尚未記錄地圖座標";
-
-  const diaryPreview = diaries[0]?.content?.trim() || trip.diary?.trim() || "";
-  $("detailDiaryPreview").innerHTML = diaries.length
-    ? renderDiaryPreview(diaries)
-    : escapeHtml(diaryPreview || "這趟旅程還沒有日記，回來時記下一句當時的心情吧。");
-  $("detailDiaryPreview").classList.toggle("is-empty", !diaryPreview);
-  $("detailDiaryDate").textContent = diaries[0]?.diary_date || dateLabel || "尚未記錄日期";
-  $("detailDiaryBody").innerHTML = renderDiaryEntries(diaries, trip.diary);
-  $("detailDiaryBody").classList.toggle("is-empty", !diaries.length && !trip.diary);
-  $("detailMapSummary").textContent = `${location}${dateLabel ? ` · ${dateLabel}` : ""}`;
-
-  const recent = photos.slice(0, 6);
-  const recentMarkup = renderDetailPhotoGrid(recent, "目前沒有照片");
-  $("detailRecentPhotos").innerHTML = recentMarkup;
-  renderTripItinerary(trip);
-  $("detailAllPhotos").innerHTML = renderTravelTimeline(trip, photos);
-  const hasPhotoTimes = photos.some((photo) => getPhotoTakenAt(photo) || photo.trip_stop_id);
-  $("detailPhotosSummary").textContent = `${photos.length} 張照片${cover ? " · 已設定封面" : ""}${hasPhotoTimes ? " · 依照片時間分組" : " · 目前依旅程日期排列"}`;
-  renderDetailExpenses(trip);
-  $("detailOverviewExpenses").innerHTML = $("detailExpenses").innerHTML;
-  setDetailTab("overview");
-}
-
-function getTripPhotos(trip) {
-  return trip?.trip_photos || trip?.photos || [];
-}
-
-function getTripDiaryRecords(trip) {
-  if (Array.isArray(trip?._diaries) && trip._diaries.length) return trip._diaries;
-  if (trip?.diary && String(trip.diary).trim()) {
-    return [{ title: "旅行日記", content: String(trip.diary), diary_date: trip.travel_date || "", mood: trip.mood || "" }];
-  }
-  return [];
-}
-
-function getTripLocations(trip) {
-  const raw = String(trip?.location_name || trip?.location || "").trim();
-  if (!raw) return ["未記錄地點"];
-  return raw.split(/\s*(?:\/|→)\s*/).map((place) => place.trim()).filter(Boolean);
-}
-
-function getTripDays(trip) {
-  return Array.isArray(trip?.trip_days) ? [...trip.trip_days].sort((a, b) => {
-    const dayDifference = (Number(a.day_number) || 0) - (Number(b.day_number) || 0);
-    return dayDifference || (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
-  }) : [];
-}
-
-function getTripStops(trip) {
-  return getTripDays(trip).flatMap((day) => (day.trip_stops || []).map((stop) => ({ ...stop, day })));
-}
-
-function renderTripItinerary(trip) {
-  const days = getTripDays(trip);
-  const photos = getTripPhotos(trip);
-  const addButton = $("detailAddStopBtn");
-  addButton.disabled = !state.stopSchemaAvailable;
-  addButton.title = state.stopSchemaAvailable ? "新增一天中的地標" : "請先執行 trip_days_stops migration";
-
-  if (!state.stopSchemaAvailable) {
-    const stopError = escapeHtml(state.stopSchemaError || "");
-    $("detailItinerarySummary").textContent = state.stopSchemaError
-      ? "地標資料目前無法讀取，請重新整理"
-      : "目前仍使用原本的旅程地點資料";
-    $("detailItineraryList").innerHTML = state.stopSchemaError
-      ? `<div class="itinerary-empty"><strong>地標資料讀取失敗</strong><p>請確認已登入正確的 Supabase 專案，並重新整理頁面。錯誤代碼：${stopError}</p></div>`
-      : `<div class="itinerary-empty"><strong>多地標功能尚未啟用</strong><p>現有旅程不會受到影響。執行專案內的 migration 後，就能建立 Day、地標、抵達時間與每日路線。</p></div>`;
-    return;
-  }
-
-  const stopCount = days.reduce((sum, day) => sum + (day.trip_stops || []).length, 0);
-  $("detailItinerarySummary").textContent = days.length + " 天 · " + stopCount + " 個地標";
-  if (!days.length) {
-    $("detailItineraryList").innerHTML = "<div class=\"itinerary-empty\"><strong>還沒有每日地標</strong><p>按「新增地標」開始建立這趟旅程的 Day 1。</p></div>";
-    return;
-  }
-
-  $("detailItineraryList").innerHTML = days.map((day) => {
-    const stops = [...(day.trip_stops || [])].sort(compareStops);
-    const dayPhotos = photos.filter((photo) => stops.some((stop) => String(stop.id) === String(photo.trip_stop_id))).length;
-    return [
-      "<section class=\"itinerary-day\" data-day-id=\"", escapeHtml(day.id), "\">",
-      "<header class=\"itinerary-day-head\"><div><p class=\"travel-day-label\">DAY ",
-      escapeHtml(day.day_number), "</p><h3>", escapeHtml(day.title || formatItineraryDate(day.date) || "未命名的一天"),
-      "</h3></div><span>", stops.length, " 個地標", dayPhotos ? " · " + dayPhotos + " 張照片" : "", "</span></header>",
-      "<div class=\"itinerary-stop-list\">",
-      stops.length ? stops.map((stop, index) => renderItineraryStop(stop, index, photos)).join("") : "<div class=\"itinerary-day-empty\">這天還沒有地標。</div>",
-      "</div></section>"
-    ].join("");
-  }).join("");
-  bindItineraryInteractions();
-}
-
-function renderItineraryStop(stop, index, photos) {
-  const stopPhotos = photos.filter((photo) => String(photo.trip_stop_id) === String(stop.id)).length;
-  const time = [stop.arrival_time, stop.departure_time].filter(Boolean).join(" — ");
-  const meta = [stop.category, time].filter(Boolean).join(" · ");
-  return [
-    "<article class=\"itinerary-stop\" draggable=\"true\" data-stop-id=\"", escapeHtml(stop.id),
-    "\" data-day-id=\"", escapeHtml(stop.day_id), "\">",
-    "<span class=\"itinerary-stop-handle\" aria-hidden=\"true\">☰</span><span class=\"itinerary-stop-order\">",
-    index + 1, "</span><div class=\"itinerary-stop-body\"><div class=\"itinerary-stop-title\"><strong>",
-    escapeHtml(stop.name), "</strong><time>", escapeHtml(stop.arrival_time || ""),
-    "</time></div><p>", escapeHtml(meta || stop.address || "尚未記錄抵達時間"), "</p>",
-    stop.note ? "<small>" + escapeHtml(stop.note) + "</small>" : "",
-    stopPhotos ? "<span class=\"itinerary-stop-photos\">📷 " + stopPhotos + " 張照片</span>" : "",
-    "</div><div class=\"itinerary-stop-actions\"><button class=\"text-action itinerary-stop-map\" type=\"button\" data-stop-map=\"",
-    escapeHtml(stop.id), "\">地圖 →</button><button class=\"text-action itinerary-stop-delete\" type=\"button\" data-stop-delete=\"",
-    escapeHtml(stop.id), "\">刪除</button></div></article>"
-  ].join("");
-}
-
-function formatItineraryDate(value) {
-  if (!value) return "";
-  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
-  return match ? match[1] + "." + match[2] + "." + match[3] : String(value);
-}
-
-function bindItineraryInteractions() {
-  const container = $("detailItineraryList");
-  let dragged = null;
-  container.querySelectorAll(".itinerary-stop").forEach((row) => {
-    row.addEventListener("dragstart", () => {
-      dragged = row;
-      row.classList.add("is-dragging");
-    });
-    row.addEventListener("dragend", () => {
-      row.classList.remove("is-dragging");
-      dragged = null;
-    });
-    row.addEventListener("dragover", (event) => {
-      event.preventDefault();
-      if (!dragged || dragged === row || dragged.dataset.dayId !== row.dataset.dayId) return;
-      const rect = row.getBoundingClientRect();
-      row.parentElement.insertBefore(dragged, event.clientY < rect.top + rect.height / 2 ? row : row.nextSibling);
-    });
-    row.querySelector("[data-stop-map]")?.addEventListener("click", () => {
-      state.selectedStopId = row.dataset.stopId;
-      setDetailTab("map");
-    });
-    row.querySelector("[data-stop-delete]")?.addEventListener("click", () => deleteStop(row.dataset.stopId));
-  });
-  container.querySelectorAll(".itinerary-stop-list").forEach((list) => {
-    list.addEventListener("drop", () => persistStopOrder(list));
-  });
-}
-
-async function persistStopOrder(list) {
-  if (state.sharedMode) return toast("分享檢視不可修改地標順序");
-  if (!state.stopSchemaAvailable) return;
-  const rows = [...list.querySelectorAll(".itinerary-stop")];
-  const results = await Promise.all(rows.map((row, index) =>
-    client.from("trip_stops").update({ sort_order: index }).eq("id", row.dataset.stopId)
-  ));
-  const failed = results.find((result) => result.error);
-  if (failed) return toast(failed.error.message || "地標排序儲存失敗");
-  toast("地標順序已儲存");
-}
-
-async function deleteStop(stopId) {
-  if (state.sharedMode) return toast("分享檢視不可刪除地標");
-  const trip = state.editingTrip;
-  const stop = getTripStops(trip).find((item) => String(item.id) === String(stopId));
-  if (!stop) return toast("找不到這個地標");
-  if (!window.confirm(`確定要刪除「${stop.name}」嗎？`)) return;
-
-  const { data, error } = await client
-    .from("trip_stops")
-    .delete()
-    .eq("id", stopId)
-    .select("id")
-    .maybeSingle();
-  if (error) {
-    console.error("[deleteStop]", error);
-    return toast(error.message || "地標刪除失敗");
-  }
-  if (!data) return toast("地標沒有成功刪除，請重新整理後再試");
-
-  const updatedTrip = state.trips.find((item) => String(item.id) === String(trip.id)) || trip;
-  updatedTrip.trip_days = (updatedTrip.trip_days || []).map((day) => ({
-    ...day,
-    trip_stops: (day.trip_stops || []).filter((item) => String(item.id) !== String(stopId))
-  }));
-  state.editingTrip = updatedTrip;
-  refreshMarkers();
-  renderTripDetail(updatedTrip);
-  setDetailTab("itinerary");
-  toast("地標已刪除");
-}
-
-function renderDiaryPreview(diaries) {
-  return diaries.slice(0, 3).map((diary) => {
-    const preview = String(diary.content || "").trim().replace(/\s+/g, " ");
-    return `
-      <div class="detail-diary-preview-entry">
-        <span>${escapeHtml(diary.diary_date || "未記錄日期")}</span>
-        <strong>${escapeHtml(diary.title || "旅行日記")}</strong>
-        ${preview ? `<small>${escapeHtml(preview.slice(0, 70))}${preview.length > 70 ? "…" : ""}</small>` : ""}
-      </div>
-    `;
-  }).join("");
-}
-
-function renderDiaryEntries(diaries, inlineDiary) {
-  if (!diaries.length && !inlineDiary) return "這趟旅程還沒有日記。";
-  if (!diaries.length) return escapeHtml(inlineDiary);
-  return diaries.map((diary) => `
-    <article class="detail-diary-entry">
-      <div class="detail-diary-entry-head">
-        <strong>${escapeHtml(diary.title || "旅行日記")}</strong>
-        <span>${escapeHtml([diary.diary_date, diary.mood].filter(Boolean).join(" · "))}</span>
-      </div>
-      <p>${escapeHtml(diary.content || "（無內容）")}</p>
-    </article>
-  `).join("");
-}
-
-function getPhotoUrl(photo) {
-  return photo?.signed_url || (photo?.storage_path ? state.photoUrls.get(photo.storage_path) : "") || "";
-}
-
-function renderDetailPhotoGrid(photos, emptyText) {
-  if (!photos.length) return `<div class="detail-empty">${escapeHtml(emptyText)}</div>`;
-  return photos.map((photo, index) => {
-    const url = getPhotoUrl(photo);
-    const label = photo.original_name || photo.name || `照片 ${index + 1}`;
-    return url
-      ? `<figure class="detail-photo-tile" data-photo-index="${index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}"><img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy"><figcaption>${escapeHtml(label)}</figcaption></figure>`
-      : `<figure class="detail-photo-tile is-missing" data-photo-index="${index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}"><div>照片載入中</div><figcaption>${escapeHtml(label)}</figcaption></figure>`;
-  }).join("");
-}
-
-function renderTravelTimeline(trip, photos) {
-  if (!photos.length) return `<div class="detail-empty">這趟旅程還沒有照片。</div>`;
-
-  const items = photos.map((photo, index) => getPhotoTimelineItem(trip, photo, index));
-  items.sort((a, b) => {
-    if (a.sortValue !== b.sortValue) return a.sortValue - b.sortValue;
-    return a.index - b.index;
-  });
-
-  const dayGroups = new Map();
-  items.forEach((item) => {
-    if (!dayGroups.has(item.dayKey)) {
-      dayGroups.set(item.dayKey, {
-        dayNumber: item.dayNumber,
-        dateLabel: item.dateLabel,
-        events: new Map(),
-        items: []
-      });
-    }
-    const day = dayGroups.get(item.dayKey);
-    const eventKey = `${item.location}::${item.timeLabel}`;
-    if (!day.events.has(eventKey)) {
-      day.events.set(eventKey, { location: item.location, timeLabel: item.timeLabel, photos: [] });
-    }
-    day.events.get(eventKey).photos.push(item);
-    day.items.push(item);
-  });
-
-  return [...dayGroups.values()].map((day) => `
-    <section class="travel-day">
-      <header class="travel-day-header">
-        <div>
-          <p class="travel-day-label">DAY ${escapeHtml(day.dayNumber)} · ${escapeHtml(day.dateLabel)}</p>
-          <h3>${escapeHtml([...new Set(day.items.map((item) => item.location))].join(" / "))}</h3>
-        </div>
-        <span>${day.items.length} 張</span>
-      </header>
-      <div class="travel-day-events">
-        ${[...day.events.values()].map((event) => `
-          <article class="travel-event">
-            <div class="travel-event-rail" aria-hidden="true"><span></span></div>
-            <div class="travel-event-content">
-              <div class="travel-event-head">
-                <time>${escapeHtml(event.timeLabel)}</time>
-                <h4>${escapeHtml(event.location)}</h4>
-              </div>
-              <div class="detail-photo-grid travel-event-photos">
-                ${event.photos.map((item) => renderTimelinePhotoTile(item)).join("")}
-              </div>
-            </div>
-          </article>
-        `).join("")}
-      </div>
-    </section>
-  `).join("");
-}
-
-function renderTimelinePhotoTile(item) {
-  const photo = item.photo;
-  const url = getPhotoUrl(photo);
-  const label = photo.original_name || photo.name || `照片 ${item.index + 1}`;
-  return url
-    ? `<figure class="detail-photo-tile" data-photo-index="${item.index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}"><img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy"><figcaption>${escapeHtml(label)}</figcaption></figure>`
-    : `<figure class="detail-photo-tile is-missing" data-photo-index="${item.index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}"><div>照片載入中</div><figcaption>${escapeHtml(label)}</figcaption></figure>`;
-}
-
-function getPhotoTimelineItem(trip, photo, index) {
-  const linkedStop = getTripStops(trip).find((stop) => String(stop.id) === String(photo?.trip_stop_id));
-  const takenAt = getPhotoTakenAt(photo);
-  const tripStart = parseTimelineDate(trip?.travel_date || trip?.date_start);
-  const stopDate = linkedStop?.day?.date ? parseTimelineDate(linkedStop.day.date)?.date : null;
-  const date = takenAt?.date || stopDate || tripStart?.date || null;
-  const dayKey = date ? toTimelineDateKey(date) : "unknown";
-  const dayNumber = tripStart?.date && date
-    ? Math.max(1, Math.round((date - tripStart.date) / 86400000) + 1)
-    : 1;
-  const location = linkedStop?.name || getPhotoTimelineLocation(trip, photo);
-  const timeLabel = takenAt?.hasTime
-    ? formatTimelineTime(takenAt.date)
-    : linkedStop?.arrival_time || "未記錄時間";
-  return {
-    photo,
-    index,
-    date,
-    dayKey,
-    dayNumber,
-    dateLabel: date ? formatTimelineDate(date) : "日期未記錄",
-    location,
-    timeLabel,
-    sortValue: date ? date.getTime() : Number.MAX_SAFE_INTEGER
-  };
-}
-
-function getPhotoTakenAt(photo) {
-  const raw = photo?.takenAt ?? photo?.taken_at ?? photo?.capturedAt ?? photo?.captured_at ?? photo?.date_taken;
-  if (raw === null || raw === undefined || raw === "") return null;
-  const parsed = parseTimelineDate(raw);
-  if (!parsed) return null;
-  return { date: parsed.date, hasTime: parsed.hasTime };
-}
-
-function parseTimelineDate(raw) {
-  if (raw instanceof Date) {
-    return Number.isNaN(raw.getTime()) ? null : { date: raw, hasTime: true };
-  }
-  if (typeof raw === "number") {
-    const date = new Date(raw);
-    return Number.isNaN(date.getTime()) ? null : { date, hasTime: true };
-  }
-
-  const text = String(raw).trim();
-  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
-  if (match) {
-    const date = new Date(
-      Number(match[1]),
-      Number(match[2]) - 1,
-      Number(match[3]),
-      Number(match[4] || 0),
-      Number(match[5] || 0),
-      Number(match[6] || 0)
-    );
-    return Number.isNaN(date.getTime()) ? null : { date, hasTime: !!match[4] };
-  }
-
-  const date = new Date(text);
-  return Number.isNaN(date.getTime()) ? null : { date, hasTime: /\d{1,2}:\d{2}/.test(text) };
-}
-
-function getPhotoTimelineLocation(trip, photo) {
-  const location = photo?.location_name || photo?.location || photo?.place_name || photo?.place || photo?.address;
-  if (location) return String(location);
-  const gps = photo?.gps && typeof photo.gps === "object" ? photo.gps : photo;
-  const lat = numberOrNull(gps?.lat ?? gps?.latitude ?? gps?.gps_lat);
-  const lng = numberOrNull(gps?.lng ?? gps?.longitude ?? gps?.gps_lng);
-  if (lat !== null && lng !== null) return `GPS ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-  return getTripLocations(trip)[0] || "未記錄地點";
-}
-
-function toTimelineDateKey(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function formatTimelineDate(date) {
-  return `${date.getMonth() + 1}月${date.getDate()}日`;
-}
-
-function formatTimelineTime(date) {
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-}
-
-function handleDetailPhotoClick(event) {
-  const tile = event.target.closest("[data-photo-index]");
-  if (!tile) return;
-  openPhotoViewer(Number(tile.dataset.photoIndex));
-}
-
-function handleDetailPhotoKeydown(event) {
-  if (event.key !== "Enter" && event.key !== " ") return;
-  const tile = event.target.closest("[data-photo-index]");
-  if (!tile) return;
-  event.preventDefault();
-  openPhotoViewer(Number(tile.dataset.photoIndex));
-}
-
-async function openPhotoViewer(index) {
-  const photos = getTripPhotos(state.editingTrip);
-  if (!photos[index]) return;
-  state.viewerPhotos = photos;
-  state.viewerIndex = Math.max(0, Math.min(index, photos.length - 1));
-  $("photoViewer").showModal();
-  await ensurePhotoUrl(state.viewerPhotos[state.viewerIndex]);
-  renderPhotoViewer();
-}
-
-async function ensurePhotoUrl(photo) {
-  if (!photo || getPhotoUrl(photo) || !photo.storage_path) return getPhotoUrl(photo);
-  const { data, error } = await client.storage.from(state.storageBucket).createSignedUrl(photo.storage_path, 60 * 60);
-  if (error) {
-    console.error("[ensurePhotoUrl]", error);
-    return "";
-  }
-  const signedUrl = data?.signedUrl || "";
-  if (signedUrl) state.photoUrls.set(photo.storage_path, signedUrl);
-  return signedUrl;
-}
-
-function renderPhotoViewer() {
-  const photo = state.viewerPhotos[state.viewerIndex];
-  if (!photo) return;
-  const url = getPhotoUrl(photo);
-  const label = photo.original_name || photo.name || `照片 ${state.viewerIndex + 1}`;
-  const linkedStop = getTripStops(state.editingTrip).find((stop) => String(stop.id) === String(photo.trip_stop_id));
-  const takenAt = getPhotoTakenAt(photo);
-  const viewerLocation = linkedStop?.name || getPhotoTimelineLocation(state.editingTrip, photo);
-  $("photoViewerTitle").textContent = label;
-  $("photoViewerMeta").textContent = [
-    takenAt?.date ? `${takenAt.date.getFullYear()}.${String(takenAt.date.getMonth() + 1).padStart(2, "0")}.${String(takenAt.date.getDate()).padStart(2, "0")}${takenAt.hasTime ? ` · ${formatTimelineTime(takenAt.date)}` : ""}` : "",
-    viewerLocation ? `📍 ${viewerLocation}` : ""
-  ].filter(Boolean).join("  ");
-  $("photoViewerCaption").textContent = photo.caption || "";
-  $("photoViewerCounter").textContent = `${state.viewerIndex + 1} / ${state.viewerPhotos.length}`;
-  $("photoViewerImage").hidden = !url;
-  $("photoViewerImage").src = url;
-  $("photoViewerMissing").hidden = !!url;
-  $("photoViewerPrevBtn").hidden = state.viewerPhotos.length < 2;
-  $("photoViewerNextBtn").hidden = state.viewerPhotos.length < 2;
-  $("photoViewerDownloadBtn").hidden = !url || (state.sharedMode && !state.editingTrip?.can_download);
-}
-
-async function changePhotoViewer(direction) {
-  if (!state.viewerPhotos.length) return;
-  state.viewerIndex = (state.viewerIndex + direction + state.viewerPhotos.length) % state.viewerPhotos.length;
-  await ensurePhotoUrl(state.viewerPhotos[state.viewerIndex]);
-  renderPhotoViewer();
-}
-
-function closePhotoViewer() {
-  const viewer = $("photoViewer");
-  if (viewer?.open) viewer.close();
-  state.viewerPhotos = [];
-  state.viewerIndex = 0;
-}
-
-async function downloadViewerPhoto() {
-  const photo = state.viewerPhotos[state.viewerIndex];
-  if (!photo) return;
-  if (state.sharedMode && !state.editingTrip?.can_download) {
-    return toast("分享者沒有開放下載");
-  }
-  await ensurePhotoUrl(photo);
-  const url = getPhotoUrl(photo);
-  if (!url) return toast("照片目前無法下載");
-  try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`照片下載失敗：HTTP ${response.status}`);
-    const blobUrl = URL.createObjectURL(await response.blob());
-    const anchor = document.createElement("a");
-    anchor.href = blobUrl;
-    anchor.download = photo.original_name || photo.name || "travel-photo.jpg";
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-  } catch (error) {
-    console.error("[downloadViewerPhoto]", error);
-    toast("照片下載失敗，請稍後再試");
-  }
-}
-
-async function downloadAllPhotos(trip, sharedMode = false) {
-  if (sharedMode && !trip?.can_download) {
-    return toast("分享者沒有開放下載");
-  }
-
-  const photos = getTripPhotos(trip);
-  if (!photos.length) return toast("這趟旅程沒有可下載的照片");
-  if (typeof window.JSZip !== "function") {
-    return toast("下載工具尚未載入，請重新整理頁面");
-  }
-
-  const zip = new window.JSZip();
-  const folderName = (trip.title || trip.location_name || "travel-photos")
-    .replace(/[\\/:*?"<>|]+/g, "-") || "travel-photos";
-  const folder = zip.folder(folderName);
-  let completed = 0;
-  let failed = 0;
-
-  toast(`正在整理 ${photos.length} 張照片…`);
-
-  for (let start = 0; start < photos.length; start += 4) {
-    const batch = photos.slice(start, start + 4);
-    await Promise.all(batch.map(async (photo, offset) => {
-      try {
-        await ensurePhotoUrl(photo);
-        const url = getPhotoUrl(photo);
-        if (!url) throw new Error("signed URL missing");
-
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-        const bytes = await response.arrayBuffer();
-        const originalName = photo.original_name || photo.name || `photo-${start + offset + 1}.jpg`;
-        const safeName = originalName.replace(/[\\/:*?"<>|]+/g, "-") || `photo-${start + offset + 1}.jpg`;
-        folder.file(`${String(start + offset + 1).padStart(3, "0")}-${safeName}`, bytes);
-        completed += 1;
-      } catch (error) {
-        failed += 1;
-        console.error("[downloadAllPhotos]", photo, error);
-      }
-    }));
-  }
-
-  if (!completed) return toast("照片目前無法下載");
-
-  try {
-    const blob = await zip.generateAsync({ type: "blob", compression: "STORE" });
-    const blobUrl = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = blobUrl;
-    anchor.download = `${folderName}.zip`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-    toast(failed ? `已下載 ${completed} 張，${failed} 張無法取得` : `已下載全部 ${completed} 張照片`);
-  } catch (error) {
-    console.error("[downloadAllPhotos] zip", error);
-    toast("照片打包失敗，請稍後再試");
-  }
-}
-
-function renderDetailMap(trip) {
-  const mapElement = $("detailMap");
-  const lat = numberOrNull(trip.lat);
-  const lng = numberOrNull(trip.lng);
-  if (!detailMap) {
-    detailMap = L.map(mapElement, { zoomControl: true }).setView([23.6, 121], 7);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap",
-      maxZoom: 19
-    }).addTo(detailMap);
-  }
-  if (detailMarker) detailMarker.remove();
-  detailStopMarkers.forEach((marker) => marker.remove());
-  detailStopMarkers = [];
-  if (detailRouteLine) {
-    detailRouteLine.remove();
-    detailRouteLine = null;
-  }
-
-  const stops = getTripStops(trip)
-    .map((stop, index) => ({
-      ...stop,
-      index,
-      lat: numberOrNull(stop.lat),
-      lng: numberOrNull(stop.lng)
-    }))
-    .filter((stop) => stop.lat !== null && stop.lng !== null);
-
-  if (stops.length) {
-    const points = stops.map((stop) => [stop.lat, stop.lng]);
-    detailRouteLine = L.polyline(points, {
-      color: "#9b5c2e",
-      weight: 3,
-      opacity: 0.72,
-      dashArray: "7 8"
-    }).addTo(detailMap);
-    stops.forEach((stop) => {
-      const marker = L.marker([stop.lat, stop.lng], {
-        icon: makeStopMarkerIcon(stop.index + 1)
-      }).addTo(detailMap);
-      marker.bindPopup("<strong>" + escapeHtml(stop.name) + "</strong><br>" + escapeHtml(stop.arrival_time || "時間未記錄"));
-      detailStopMarkers.push(marker);
-    });
-    const selected = stops.find((stop) => String(stop.id) === String(state.selectedStopId));
-    if (selected) {
-      detailMap.setView([selected.lat, selected.lng], 15);
-      const selectedMarker = detailStopMarkers[stops.indexOf(selected)];
-      selectedMarker?.openPopup();
-    } else {
-      detailMap.fitBounds(points, { padding: [36, 36], maxZoom: 14 });
-    }
-    $("detailMapSummary").textContent = "已記錄 " + stops.length + " 個地標 · 路線依排序連線";
-    setTimeout(() => detailMap.invalidateSize(), 80);
-    return;
-  }
-
-  if (lat === null || lng === null) {
-    detailMap.setView([23.6, 121], 7);
-    $("detailMapSummary").textContent = getTripStops(trip).length
-      ? "地標尚未記錄座標"
-      : "這趟旅程尚未記錄座標";
-  } else {
-    detailMap.setView([lat, lng], 13);
-    detailMarker = L.marker([lat, lng], { icon: makeMarkerIcon(trip) }).addTo(detailMap);
-  }
-  setTimeout(() => detailMap.invalidateSize(), 80);
-}
-
-function makeStopMarkerIcon(order) {
-  return L.divIcon({
-    className: "stop-marker-wrap",
-    html: "<span class=\"stop-marker\">" + escapeHtml(order) + "</span>",
-    iconSize: [34, 34],
-    iconAnchor: [17, 17]
-  });
-}
-
-function renderDetailExpenses(trip) {
-  let expenses = trip.expenses ?? trip.expense ?? null;
-  if (typeof expenses === "string") {
-    try { expenses = JSON.parse(expenses); } catch (error) { expenses = null; }
-  }
-  if (!expenses || typeof expenses !== "object") {
-    $("detailExpenses").innerHTML = `<div class="detail-empty">這趟旅程尚未記錄花費。</div>`;
-    return;
-  }
-  const categories = [
-    ["transport", "交通"],
-    ["hotel", "住宿"],
-    ["food", "餐飲"],
-    ["other", "其他"]
-  ];
-  const original = expenses.original && typeof expenses.original === "object" ? expenses.original : {};
-  const converted = expenses.twd && typeof expenses.twd === "object" ? expenses.twd : {};
-  const legacyConverted = Object.fromEntries(categories.map(([key]) => [key, expenses[key]]));
-  const totalSource = Object.values(converted).some((value) => Number(value)) ? converted : legacyConverted;
-  const hasOriginal = categories.some(([key]) => Number(original[key]) !== 0);
-  const rowSource = hasOriginal ? original : totalSource;
-  const currency = expenses.currency || expenses.orig_currency || (hasOriginal ? "原幣" : "TWD");
-  const rows = categories.filter(([key]) => Number.isFinite(Number(rowSource[key])) && Number(rowSource[key]) !== 0);
-  const total = categories.reduce((sum, [key]) => sum + (Number(totalSource[key]) || 0), 0);
-  $("detailExpenses").innerHTML = `
-    <div class="detail-expense-total"><span>約合台幣</span><strong>${total ? `NT$ ${Math.round(total).toLocaleString()}` : "尚未換算"}</strong></div>
-    <div class="detail-expense-list">${rows.length ? rows.map(([key, label]) => {
-      const value = Number(rowSource[key]);
-      const convertedValue = Number(totalSource[key]);
-      const convertedLabel = hasOriginal && Number.isFinite(convertedValue) && convertedValue !== value
-        ? `<small>約 NT$ ${Math.round(convertedValue).toLocaleString()}</small>`
-        : "";
-      return `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(currency)} ${value.toLocaleString()}${convertedLabel}</strong></div>`;
-    }).join("") : `<div class="detail-empty">尚未記錄支出項目。</div>`}</div>`;
-}
-
-const expenseCategories = ["transport", "hotel", "food", "other"];
-
-function parseExpenseRecord(value) {
-  if (!value) return null;
-  if (typeof value === "object") return value;
-  if (typeof value !== "string") return null;
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch (error) {
-    console.warn("[parseExpenseRecord]", error);
-    return null;
-  }
-}
-
-function getExpenseEditorValues(value) {
-  const expenses = parseExpenseRecord(value) || {};
-  const source = expenses.original && typeof expenses.original === "object"
-    ? expenses.original
-    : expenses;
-  return {
-    currency: expenses.orig_currency || expenses.currency || "TWD",
-    transport: source.transport ?? "",
-    hotel: source.hotel ?? "",
-    food: source.food ?? "",
-    other: source.other ?? ""
-  };
-}
-
-function fillExpenseEditor(value) {
-  const values = getExpenseEditorValues(value);
-  $("expenseCurrencyInput").value = values.currency;
-  expenseCategories.forEach((category) => {
-    $(`expense${category[0].toUpperCase()}${category.slice(1)}Input`).value = values[category];
-  });
-}
-
-function readExpenseEditor(existingValue) {
-  const existing = parseExpenseRecord(existingValue) || {};
-  const values = Object.fromEntries(expenseCategories.map((category) => {
-    const id = `expense${category[0].toUpperCase()}${category.slice(1)}Input`;
-    const value = Number($(id).value);
-    return [category, Number.isFinite(value) && value > 0 ? value : 0];
-  }));
-  const hasAmount = expenseCategories.some((category) => values[category] > 0);
-  if (!hasAmount) return null;
-
-  const currency = $("expenseCurrencyInput").value || "TWD";
-  const next = { ...existing, currency, orig_currency: currency, original: values };
-  if (currency === "TWD") {
-    next.rate = 1;
-    expenseCategories.forEach((category) => { next[category] = values[category]; });
-    delete next.twd;
-  } else if (Number.isFinite(Number(existing.rate)) && Number(existing.rate) > 0) {
-    const rate = Number(existing.rate);
-    next.twd = Object.fromEntries(expenseCategories.map((category) => [category, Math.round(values[category] * rate)]));
-    expenseCategories.forEach((category) => { next[category] = next.twd[category]; });
-  } else {
-    // Preserve the selected original amounts until a live exchange rate is available.
-    expenseCategories.forEach((category) => { next[category] = values[category]; });
-  }
-  return JSON.stringify(next);
+  renderDrawer(trip, state.sharedMode);
 }
 
 function getShareUrl(token) {
@@ -1875,145 +331,66 @@ function getShareUrl(token) {
   return url.href;
 }
 
-function createShareToken() {
-  const cryptoApi = globalThis.crypto;
-  if (typeof cryptoApi?.randomUUID === "function") return cryptoApi.randomUUID();
-  if (typeof cryptoApi?.getRandomValues === "function") {
-    const bytes = new Uint8Array(16);
-    cryptoApi.getRandomValues(bytes);
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-  }
-  throw new Error("此瀏覽器無法安全產生分享 token");
-}
-
-async function toggleTripSharing(trip, nextValue = !trip?.is_shared) {
-  if (state.sharedMode) return toast("分享檢視不可修改分享設定");
-  if (!trip?.id || !client) return toast("目前無法更新分享設定");
-
-  try {
-    const payload = { is_shared: Boolean(nextValue) };
-    if (payload.is_shared) payload.share_token = trip.share_token || createShareToken();
-    const { data, error } = await client
-      .from("trips")
-      .update(payload)
-      .eq("id", trip.id)
-      .select("id,is_shared,share_token")
-      .maybeSingle();
-
-    if (error) throw error;
-    if (!data) throw new Error("旅程沒有成功更新，請重新整理後再試");
-
-    Object.assign(trip, data);
-    if (state.sharedTrip && String(state.sharedTrip.id) === String(trip.id)) {
-      Object.assign(state.sharedTrip, data);
-    }
-
-    renderTrips();
-    refreshMarkers();
-
-    if (state.editingTrip && String(state.editingTrip.id) === String(trip.id)) {
-      state.editingTrip = trip;
-      if (!$('tripDetailPage')?.hidden && !state.sharedMode) {
-        const activeTab = document.querySelector("[data-detail-tab].active")?.dataset.detailTab || "overview";
-        renderTripDetail(trip);
-        setDetailTab(activeTab);
-      }
-      if (!$('detailDrawer')?.hidden && !state.sharedMode) renderDrawer(trip, false);
-    }
-
-    if (!data.is_shared) {
-      toast("已關閉分享");
-      return;
-    }
-
-    const shareUrl = getShareUrl(data.share_token);
-    if (!shareUrl) {
-      toast("分享已開啟；請在正式 HTTP(S) 網址查看分享連結");
-      return;
-    }
-    await copyText(shareUrl, "分享已開啟，連結已複製");
-  } catch (error) {
-    console.error("[toggleTripSharing]", error);
-    toast(`分享設定失敗：${error.message || "未知錯誤"}`);
-  }
-}
-
 function renderDrawer(trip, sharedMode) {
-  const cover = getCoverUrl(trip);
-  const photos = getTripPhotos(trip);
   const shareUrl = getShareUrl(trip.share_token);
+  const mapUrl = getMapUrl(trip);
   const tags = (trip.tags || []).map((tag) => `<span class="chip">${escapeHtml(tag)}</span>`).join("");
-  const photoButtons = cover
-    ? `<button class="btn btn-soft" id="downloadPhotoBtn">${sharedMode && !trip.can_download ? "不可下載" : "下載照片"}</button>`
+  const photos = getTripPhotos(trip).filter((photo) => getPhotoUrl(photo));
+  const photoGallery = photos.length
+    ? `<div class="photo-gallery">${photos.map((photo) => `
+        <figure class="photo-tile">
+          <img src="${escapeHtml(getPhotoUrl(photo))}" alt="${escapeHtml(photo.caption || trip.location_name)}">
+          ${!sharedMode ? `<button class="photo-delete-btn" type="button" data-photo-id="${escapeHtml(photo.id)}">刪除</button>` : ""}
+        </figure>
+      `).join("")}</div>`
     : "";
-  const downloadAllButton = sharedMode && trip.can_download && photos.length
-    ? `<button class="btn btn-primary" id="downloadAllPhotosBtn">下載全部照片（${photos.length}）</button>`
+  const photoButtons = photos.length
+    ? `<button class="btn btn-soft" id="downloadPhotoBtn">${sharedMode && !trip.can_download ? "不可下載" : "下載第一張"}</button>`
     : "";
   const guestUpload = sharedMode && trip.can_guest_upload
     ? `
       <label class="guest-upload">
-        朋友補照片
-        <input type="file" id="guestPhotoInput" accept="image/*">
+        朋友補照片（可多選）
+        <input type="file" id="guestPhotoInput" accept="image/*" multiple>
       </label>
     `
-    : "";
-  const sharedPhotoGallery = sharedMode && photos.length
-    ? `
-      <section class="shared-photo-section">
-        <div class="shared-photo-section-head">
-          <strong>全部照片</strong>
-          <span>${photos.length} 張 · 點選查看</span>
-        </div>
-        <div class="detail-photo-grid shared-photo-grid" id="sharedPhotoGrid">
-          ${renderDetailPhotoGrid(photos, "目前沒有照片")}
-        </div>
-      </section>
-    `
-    : "";
-  const shareButton = !sharedMode && trip.is_shared
-    ? shareUrl
-      ? `<button class="btn btn-soft" id="copyShareBtn">複製分享連結</button>`
-      : `<button class="btn btn-soft" id="repairShareBtn">重新建立分享連結</button>`
     : "";
 
   $("drawerTitle").textContent = trip.title || trip.location_name;
   $("drawerBody").innerHTML = `
-    ${cover ? `<img class="detail-photo" src="${escapeHtml(cover)}" alt="${escapeHtml(trip.location_name)}">` : ""}
+    ${photoGallery}
+    <div class="location-card">
+      <div><span>旅行地點</span><strong>${escapeHtml(trip.location_name)}</strong></div>
+      ${mapUrl ? `<a class="location-link" href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener noreferrer">在地圖查看</a>` : ""}
+    </div>
     <div class="chip-row">
       <span class="chip private">${trip.is_shared ? "已開啟分享" : "私人"}</span>
-      <span class="chip blue">${escapeHtml(trip.location_name)}</span>
       ${trip.travel_date ? `<span class="chip blue">${formatDate(trip.travel_date)}</span>` : ""}
       ${trip.mood ? `<span class="chip">${escapeHtml(trip.mood)}</span>` : ""}
       ${tags}
     </div>
     ${trip.diary ? `<div class="diary">${escapeHtml(trip.diary)}</div>` : ""}
-    ${sharedPhotoGallery}
     <div class="drawer-actions">
       ${!sharedMode ? `<button class="btn btn-primary" id="editTripBtn">編輯</button>` : ""}
-      ${shareButton}
+      ${!sharedMode && trip.is_shared && shareUrl ? `<button class="btn btn-soft" id="shareTripBtn">分享旅程</button>` : ""}
       ${photoButtons}
-      ${downloadAllButton}
     </div>
     ${guestUpload}
     ${!sharedMode && trip.is_shared
       ? shareUrl
         ? `<p class="trip-meta">分享連結：${escapeHtml(shareUrl)}</p>`
-        : `<p class="trip-meta">這趟旅程缺少分享 token，請重新建立分享連結。</p>`
+        : `<p class="trip-meta">請使用 HTTP(S) 網址開啟網站後再建立分享連結。</p>`
       : ""}
   `;
 
   $("detailDrawer").hidden = false;
   $("editTripBtn")?.addEventListener("click", () => openTripDialog(trip));
-  $("copyShareBtn")?.addEventListener("click", () => copyText(shareUrl));
-  $("repairShareBtn")?.addEventListener("click", () => toggleTripSharing(trip, true));
-  $("sharedPhotoGrid")?.addEventListener("click", handleDetailPhotoClick);
-  $("sharedPhotoGrid")?.addEventListener("keydown", handleDetailPhotoKeydown);
+  $("shareTripBtn")?.addEventListener("click", () => shareTrip(trip, shareUrl));
   $("downloadPhotoBtn")?.addEventListener("click", () => downloadCover(trip, sharedMode));
-  $("downloadAllPhotosBtn")?.addEventListener("click", () => downloadAllPhotos(trip, sharedMode));
-  $("guestPhotoInput")?.addEventListener("change", (event) => uploadGuestPhoto(event, trip.share_token));
+  $("guestPhotoInput")?.addEventListener("change", (event) => uploadGuestPhotos(event, trip.share_token));
+  $("drawerBody").querySelectorAll(".photo-delete-btn").forEach((button) => {
+    button.addEventListener("click", () => deletePhoto(button.dataset.photoId, trip.id));
+  });
 }
 
 function closeDrawer() {
@@ -2023,22 +400,17 @@ function closeDrawer() {
 
 function closeTripDialog() {
   clearPhotoPreview();
-  state.selectedPhoto = null;
+  state.selectedPhotos = [];
   $("tripDialog").close();
 }
 
 function openTripDialog(trip = null) {
-  if (state.sharedMode) return toast("分享檢視不可編輯旅程");
   state.editingTrip = trip;
-  state.selectedPhoto = null;
-  state.locationResults = [];
+  state.selectedPhotos = [];
   clearPhotoPreview();
-  clearLocationResults();
   $("dialogTitle").textContent = trip ? "編輯旅途" : "新增旅途";
   $("deleteTripBtn").hidden = !trip;
   $("tripForm").reset();
-  $("photoPreview").hidden = true;
-  $("photoPreview").removeAttribute("src");
 
   if (trip) {
     $("titleInput").value = trip.title || "";
@@ -2049,348 +421,78 @@ function openTripDialog(trip = null) {
     $("moodInput").value = trip.mood || "";
     $("diaryInput").value = trip.diary || "";
     $("tagsInput").value = (trip.tags || []).join(", ");
-    fillExpenseEditor(trip.expenses ?? trip.expense);
     $("sharedInput").checked = !!trip.is_shared;
     $("downloadInput").checked = !!trip.can_download;
     $("guestUploadInput").checked = !!trip.can_guest_upload;
-    const cover = getCoverUrl(trip);
-    if (cover) {
-      $("photoPreview").src = cover;
-      $("photoPreview").hidden = false;
+    const existingCount = getTripPhotos(trip).length;
+    if (existingCount) {
+      $("photoSelectionSummary").textContent = `已上傳 ${existingCount} 張；可在旅程詳情中單張刪除。`;
+      $("photoSelectionSummary").hidden = false;
     }
   } else {
     $("dateInput").value = new Date().toISOString().slice(0, 10);
-    fillExpenseEditor(null);
   }
 
   $("tripDialog").showModal();
 }
 
-async function openStopDialog() {
-  if (state.sharedMode) return toast("分享檢視不可新增地標");
-  const trip = state.editingTrip;
-  if (!trip) return;
-  if (!state.stopSchemaAvailable) return toast("請先執行 trip_days_stops migration");
-
-  try {
-    await ensureTripDays(trip);
-    populateStopDayOptions(trip);
-    resetStopForm();
-    $("stopDialog").showModal();
-  } catch (error) {
-    console.error("[openStopDialog]", error);
-    toast(error.message || "每日行程初始化失敗");
-  }
-}
-
-async function ensureTripDays(trip) {
-  if (getTripDays(trip).length) return;
-  const start = trip.travel_date || trip.date_start || "";
-  const end = trip.travel_date_end || trip.date_end || start;
-  const startDate = parseTimelineDate(start)?.date || null;
-  const endDate = parseTimelineDate(end)?.date || startDate;
-  const dayCount = startDate && endDate
-    ? Math.max(1, Math.round((endDate - startDate) / 86400000) + 1)
-    : 1;
-  const locations = getTripLocations(trip);
-  const rows = Array.from({ length: dayCount }, (_, index) => {
-    const date = startDate ? new Date(startDate.getTime() + index * 86400000) : null;
-    return {
-      trip_id: trip.id,
-      day_number: index + 1,
-      date: date ? toTimelineDateKey(date) : null,
-      title: locations[index] || null,
-      sort_order: index
-    };
-  });
-  const { error } = await client.from("trip_days").insert(rows);
-  if (error) throw error;
-  await loadTripStops();
-}
-
-function populateStopDayOptions(trip) {
-  $("stopDayInput").innerHTML = getTripDays(trip).map((day) => {
-    const label = "Day " + day.day_number + (day.title ? " · " + day.title : "");
-    return "<option value=\"" + escapeHtml(day.id) + "\">" + escapeHtml(label) + "</option>";
-  }).join("");
-}
-
-function resetStopForm() {
-  $("stopForm").reset();
-  $("stopFormStatus").textContent = "";
-  $("stopLocationStatus").textContent = "";
-  $("stopLocationResults").innerHTML = "";
-  $("stopLocationResults").hidden = true;
-  state.stopLocationResults = [];
-}
-
-function closeStopDialog(reset = true) {
-  const dialog = $("stopDialog");
-  if (dialog?.open) dialog.close();
-  if (reset) resetStopForm();
-}
-
-async function saveStop(event) {
-  event.preventDefault();
-  if (state.sharedMode) return toast("分享檢視不可儲存地標");
-  const trip = state.editingTrip;
-  if (!trip || !state.stopSchemaAvailable) return;
-  const dayId = $("stopDayInput").value;
-  const day = getTripDays(trip).find((item) => String(item.id) === String(dayId));
-  const name = $("stopNameInput").value.trim();
-  if (!day || !name) return toast("請選擇 Day 並輸入地標名稱");
-
-  const payload = {
-    day_id: day.id,
-    name,
-    address: $("stopAddressInput").value.trim() || null,
-    lat: numberOrNull($("stopLatInput").value),
-    lng: numberOrNull($("stopLngInput").value),
-    arrival_time: $("stopArrivalInput").value || null,
-    departure_time: $("stopDepartureInput").value || null,
-    category: $("stopCategoryInput").value || null,
-    mood: $("stopMoodInput").value || null,
-    note: $("stopNoteInput").value.trim() || null,
-    sort_order: (day.trip_stops || []).length
-  };
-  if ((payload.lat === null) !== (payload.lng === null)) return toast("緯度與經度請一起填寫");
-
-  const { data: savedStop, error } = await client.from("trip_stops").insert(payload).select("id").single();
-  if (error) {
-    console.error("[saveStop]", error);
-    return toast(error.message || "地標儲存失敗");
-  }
-
-  const files = [...$("stopPhotoInput").files];
-  if (files.length && savedStop?.id) {
-    try {
-      await uploadStopPhotos(trip.id, savedStop.id, files);
-    } catch (uploadError) {
-      console.error("[saveStop.photos]", uploadError);
-      toast("地標已加入，但照片上傳失敗：" + uploadError.message);
-    }
-  }
-
-  await loadTripStops();
-  await hydratePhotoUrls();
-  renderTripDetail(trip);
-  setDetailTab("itinerary");
-  toast("已加入 " + name);
-  const selectedDay = $("stopDayInput").value;
-  resetStopForm();
-  $("stopDayInput").value = selectedDay;
-  $("stopFormStatus").textContent = "✓ 已加入 " + name + "，可以繼續新增地標";
-}
-
-async function uploadStopPhotos(tripId, stopId, files) {
-  const uploaded = [];
-  try {
-    for (const file of files) {
-      if (!file.type.startsWith("image/")) throw new Error("只能上傳圖片檔");
-      const result = await uploadPhoto(tripId, file);
-      if (result.error) {
-        await rollbackUploadedPhoto(result.record);
-        throw result.error;
-      }
-      const { error } = await client.from("trip_photos").update({ trip_stop_id: stopId }).eq("id", result.record.id);
-      if (error) {
-        await rollbackUploadedPhoto(result.record);
-        throw error;
-      }
-      uploaded.push(result.record);
-    }
-  } catch (error) {
-    await Promise.all(uploaded.map((record) => rollbackUploadedPhoto(record)));
-    throw error;
-  }
-}
-
-async function searchStopLocation() {
-  const query = [$("stopNameInput").value.trim(), $("stopAddressInput").value.trim()].filter(Boolean).join(", ");
-  if (!query) return toast("請先輸入地標名稱");
-  const button = $("searchStopLocationBtn");
-  button.disabled = true;
-  button.textContent = "搜尋中…";
-  $("stopLocationStatus").textContent = "正在尋找地標…";
-  try {
-    const params = new URLSearchParams({
-      q: query,
-      format: "jsonv2",
-      addressdetails: "1",
-      limit: "5",
-      "accept-language": "zh-TW,zh,en"
-    });
-    const response = await fetch("https://nominatim.openstreetmap.org/search?" + params);
-    if (!response.ok) throw new Error("地標搜尋失敗：HTTP " + response.status);
-    const results = await response.json();
-    state.stopLocationResults = Array.isArray(results) ? results.filter((result) => result.lat && result.lon) : [];
-    renderStopLocationResults(query);
-  } catch (error) {
-    console.error("[searchStopLocation]", error);
-    $("stopLocationStatus").textContent = "搜尋失敗，請手動輸入地址或座標。";
-  } finally {
-    button.disabled = false;
-    button.textContent = "搜尋地點";
-  }
-}
-
-function renderStopLocationResults(query) {
-  const results = $("stopLocationResults");
-  if (!state.stopLocationResults.length) {
-    $("stopLocationStatus").textContent = "找不到「" + query + "」，請換個關鍵字。";
-    results.hidden = true;
-    return;
-  }
-  $("stopLocationStatus").textContent = "請選擇正確的地標：";
-  results.innerHTML = state.stopLocationResults.map((result, index) => [
-    "<button class=\"location-result\" type=\"button\" role=\"option\" data-stop-location-index=\"", index, "\">",
-    "<strong>", escapeHtml(result.name || result.display_name?.split(",")[0] || query), "</strong>",
-    "<span>", escapeHtml(result.display_name || ""), "</span></button>"
-  ].join("")).join("");
-  results.hidden = false;
-  results.querySelectorAll("[data-stop-location-index]").forEach((button) => {
-    button.addEventListener("click", () => selectStopLocation(Number(button.dataset.stopLocationIndex)));
-  });
-}
-
-function selectStopLocation(index) {
-  const result = state.stopLocationResults[index];
-  if (!result) return;
-  const name = result.name || result.display_name?.split(",")[0] || $("stopNameInput").value.trim();
-  $("stopNameInput").value = name;
-  $("stopAddressInput").value = result.display_name || "";
-  $("stopLatInput").value = Number(result.lat).toFixed(6);
-  $("stopLngInput").value = Number(result.lon).toFixed(6);
-  $("stopLocationStatus").textContent = "已選擇：" + (result.display_name || name);
-  $("stopLocationResults").hidden = true;
-}
-
-function pickStopOnMap() {
-  if (!state.editingTrip) return;
-  closeStopDialog(false);
-  setDetailTab("map");
-  toast("請在地圖上點選地標位置");
-  setTimeout(() => {
-    if (!detailMap) return;
-    detailMap.once("click", (event) => {
-      $("stopLatInput").value = event.latlng.lat.toFixed(6);
-      $("stopLngInput").value = event.latlng.lng.toFixed(6);
-      $("stopLocationStatus").textContent = "已從地圖取得座標，可繼續填寫地標資料";
-      setDetailTab("itinerary");
-      $("stopDialog").showModal();
-    });
-  }, 100);
-}
-
-async function searchLocation() {
-  const query = $("locationInput").value.trim();
-  if (!query) return toast("請先輸入地點名稱");
-
-  const button = $("searchLocationBtn");
-  button.disabled = true;
-  button.textContent = "搜尋中…";
-  $("locationSearchStatus").textContent = "正在尋找地標…";
-  clearLocationResults();
-
-  try {
-    const params = new URLSearchParams({
-      q: query,
-      format: "jsonv2",
-      addressdetails: "1",
-      limit: "5",
-      "accept-language": "zh-TW,zh,en"
-    });
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`);
-    if (!response.ok) throw new Error(`地標搜尋失敗：HTTP ${response.status}`);
-    const results = await response.json();
-    state.locationResults = Array.isArray(results) ? results.filter((result) => result.lat && result.lon) : [];
-    renderLocationResults(query);
-  } catch (error) {
-    console.error("[searchLocation]", error);
-    $("locationSearchStatus").textContent = "地標搜尋失敗，請稍後再試或手動輸入座標。";
-  } finally {
-    button.disabled = false;
-    button.textContent = "搜尋地標";
-  }
-}
-
-function renderLocationResults(query) {
-  const results = $("locationResults");
-  if (!state.locationResults.length) {
-    $("locationSearchStatus").textContent = `找不到「${query}」的地標，請換個關鍵字。`;
-    results.hidden = true;
-    return;
-  }
-
-  $("locationSearchStatus").textContent = "請選擇正確的地標：";
-  results.innerHTML = state.locationResults.map((result, index) => `
-    <button class="location-result" type="button" role="option" data-location-index="${index}">
-      <strong>${escapeHtml(result.name || result.display_name?.split(",")[0] || query)}</strong>
-      <span>${escapeHtml(result.display_name || "")}</span>
-    </button>
-  `).join("");
-  results.hidden = false;
-  results.querySelectorAll("[data-location-index]").forEach((button) => {
-    button.addEventListener("click", () => selectLocationResult(Number(button.dataset.locationIndex)));
-  });
-}
-
-function selectLocationResult(index) {
-  const result = state.locationResults[index];
-  if (!result) return;
-  const name = result.name || result.display_name?.split(",")[0] || $("locationInput").value.trim();
-  $("locationInput").value = name;
-  $("latInput").value = Number(result.lat).toFixed(6);
-  $("lngInput").value = Number(result.lon).toFixed(6);
-  $("locationSearchStatus").textContent = `已選擇：${result.display_name || name}`;
-  $("locationResults").hidden = true;
-
-  const lat = numberOrNull(result.lat);
-  const lng = numberOrNull(result.lon);
-  if (map && lat !== null && lng !== null) map.setView([lat, lng], 13);
-}
-
-function clearLocationResults() {
-  const results = $("locationResults");
-  const status = $("locationSearchStatus");
-  if (!results || !status) return;
-  results.innerHTML = "";
-  results.hidden = true;
-  status.textContent = "";
-}
-
 function clearPhotoPreview() {
-  if (state.photoPreviewUrl) URL.revokeObjectURL(state.photoPreviewUrl);
-  state.photoPreviewUrl = null;
-  $("photoPreview").removeAttribute("src");
-  $("photoPreview").hidden = true;
+  state.photoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+  state.photoPreviewUrls = [];
+  $("photoInput").value = "";
+  $("photoPreviewGrid").replaceChildren();
+  $("photoPreviewGrid").hidden = true;
+  $("photoSelectionSummary").textContent = "";
+  $("photoSelectionSummary").hidden = true;
 }
 
-async function handlePhotoInput(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  if (!file.type.startsWith("image/")) return toast("請選擇圖片檔");
-  state.selectedPhoto = file;
-  if (state.photoPreviewUrl) URL.revokeObjectURL(state.photoPreviewUrl);
-  state.photoPreviewUrl = URL.createObjectURL(file);
-  $("photoPreview").src = state.photoPreviewUrl;
-  $("photoPreview").hidden = false;
+function handlePhotoInput(event) {
+  const files = Array.from(event.target.files || []);
+  if (!files.length) return;
+  if (files.length > 30) {
+    event.target.value = "";
+    return toast("一次最多選擇 30 張照片");
+  }
+
+  const invalidFile = files.find((file) => !file.type.startsWith("image/") || file.size > 10 * 1024 * 1024);
+  if (invalidFile) {
+    event.target.value = "";
+    return toast(`${invalidFile.name} 不是圖片或超過 10MB`);
+  }
+
+  const unique = new Map();
+  files.forEach((file) => unique.set(`${file.name}:${file.size}:${file.lastModified}:${file.type}`, file));
+  state.selectedPhotos = [...unique.values()];
+  renderSelectedPhotoPreviews();
+}
+
+function renderSelectedPhotoPreviews() {
+  state.photoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+  state.photoPreviewUrls = state.selectedPhotos.map((file) => URL.createObjectURL(file));
+  const grid = $("photoPreviewGrid");
+  grid.innerHTML = state.selectedPhotos.map((file, index) => `
+    <span class="photo-preview-item">
+      <img src="${escapeHtml(state.photoPreviewUrls[index])}" alt="${escapeHtml(file.name)}">
+      <button class="photo-preview-remove" type="button" data-preview-index="${index}" aria-label="移除 ${escapeHtml(file.name)}">×</button>
+    </span>
+  `).join("");
+  grid.hidden = !state.selectedPhotos.length;
+  $("photoSelectionSummary").textContent = state.selectedPhotos.length
+    ? `已選擇 ${state.selectedPhotos.length} 張照片`
+    : "";
+  $("photoSelectionSummary").hidden = !state.selectedPhotos.length;
+
+  grid.querySelectorAll(".photo-preview-remove").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedPhotos.splice(Number(button.dataset.previewIndex), 1);
+      renderSelectedPhotoPreviews();
+    });
+  });
 }
 
 async function saveTrip(event) {
   event.preventDefault();
-  if (state.sharedMode) return toast("分享檢視不可儲存旅程");
   const trip = state.editingTrip;
-  const isShared = $("sharedInput").checked;
-  let shareToken = trip?.share_token || null;
-  if (isShared && !shareToken) {
-    try {
-      shareToken = createShareToken();
-    } catch (error) {
-      console.error("[saveTrip.shareToken]", error);
-      return toast(error.message || "無法建立安全分享連結");
-    }
-  }
   const payload = {
     title: $("titleInput").value.trim() || null,
     location_name: $("locationInput").value.trim(),
@@ -2400,9 +502,7 @@ async function saveTrip(event) {
     mood: $("moodInput").value || null,
     diary: $("diaryInput").value.trim() || null,
     tags: parseTags($("tagsInput").value),
-    expenses: readExpenseEditor(trip?.expenses ?? trip?.expense),
-    is_shared: isShared,
-    share_token: shareToken,
+    is_shared: $("sharedInput").checked,
     can_download: $("downloadInput").checked,
     can_guest_upload: $("guestUploadInput").checked,
     updated_at: new Date().toISOString()
@@ -2410,16 +510,12 @@ async function saveTrip(event) {
 
   if (!payload.location_name) return toast("請輸入地點名稱");
 
-  if (state.schemaMode === "legacy") {
-    if (state.selectedPhoto) {
-      return toast("舊版旅程的照片請從原本相簿流程上傳，這次不會覆蓋既有照片");
-    }
-    return saveLegacyTrip(trip, payload);
-  }
-
   let savedTrip = trip;
-  let uploadedPhoto = null;
+  const uploadedPhotos = [];
   let committed = false;
+  const saveButton = $("saveTripBtn");
+  saveButton.disabled = true;
+  saveButton.textContent = state.selectedPhotos.length ? `準備上傳 ${state.selectedPhotos.length} 張` : "儲存中";
 
   try {
     if (!trip) {
@@ -2429,9 +525,10 @@ async function saveTrip(event) {
       savedTrip = data;
     }
 
-    if (state.selectedPhoto) {
-      const result = await uploadPhoto(savedTrip.id, state.selectedPhoto);
-      uploadedPhoto = result.record;
+    for (const [index, file] of state.selectedPhotos.entries()) {
+      saveButton.textContent = `上傳中 ${index + 1}/${state.selectedPhotos.length}`;
+      const result = await uploadPhoto(savedTrip.id, file);
+      uploadedPhotos.push(result.record);
       if (result.error) throw result.error;
     }
 
@@ -2450,109 +547,26 @@ async function saveTrip(event) {
     committed = true;
     clearPhotoPreview();
     $("tripDialog").close();
-    toast("旅途已儲存");
+    toast(uploadedPhotos.length ? `旅途已儲存，已上傳 ${uploadedPhotos.length} 張照片` : "旅途已儲存");
     await loadTrips();
     openTrip(savedTrip.id);
   } catch (error) {
     console.error("[saveTrip]", error);
     if (!committed) {
-      await rollbackUploadedPhoto(uploadedPhoto);
+      await rollbackUploadedPhotos(uploadedPhotos);
       if (!trip && savedTrip?.id) await deleteTripRow(savedTrip.id);
     }
     toast(error.message || "旅途儲存失敗");
+  } finally {
+    saveButton.disabled = false;
+    saveButton.textContent = "儲存";
   }
-}
-
-async function saveLegacyTrip(trip, payload) {
-  const legacyPayload = {
-    name: payload.title || payload.location_name,
-    location: payload.location_name,
-    lat: payload.lat,
-    lng: payload.lng,
-    date_start: payload.travel_date,
-    // The legacy form only edits the start date, so preserve an existing end date.
-    date_end: trip?.date_end || payload.travel_date,
-    expenses: payload.expenses,
-    is_shared: payload.is_shared,
-    share_token: payload.share_token
-  };
-  const legacyPermissionPayload = {
-    ...legacyPayload,
-    can_download: payload.can_download,
-    can_guest_upload: payload.can_guest_upload
-  };
-  try {
-    let savedId = trip?.id;
-    if (trip) {
-      let { data, error } = await client
-        .from("trips")
-        .update(legacyPermissionPayload)
-        .eq("id", trip.id)
-        .select("id,is_shared,share_token")
-        .maybeSingle();
-      if (error && isMissingTripExpenseColumn(error)) {
-        throw new Error("目前 Supabase trips 表缺少 expenses 欄位，請先執行 expenses migration");
-      }
-      if (error && isMissingTripPermissionColumn(error)) {
-        ({ data, error } = await client
-          .from("trips")
-          .update({
-            name: legacyPayload.name,
-            location: legacyPayload.location,
-            lat: legacyPayload.lat,
-            lng: legacyPayload.lng,
-            date_start: legacyPayload.date_start,
-            date_end: legacyPayload.date_end,
-            expenses: legacyPayload.expenses,
-            is_shared: legacyPayload.is_shared,
-            share_token: legacyPayload.share_token
-          })
-          .eq("id", trip.id)
-          .select("id,is_shared,share_token")
-          .maybeSingle());
-      }
-      if (error) throw error;
-      if (!data) throw new Error("旅程沒有成功更新，請重新整理後再試");
-    } else {
-      const baseInsert = {
-        ...legacyPayload,
-        user_id: state.user.id,
-        photo_count: 0
-      };
-      let { data, error } = await client.from("trips").insert({
-        ...baseInsert,
-        can_download: payload.can_download,
-        can_guest_upload: payload.can_guest_upload
-      }).select("id").single();
-      if (error && isMissingTripPermissionColumn(error)) {
-        ({ data, error } = await client.from("trips").insert(baseInsert).select("id").single());
-      }
-      if (error) throw error;
-      savedId = data?.id;
-    }
-    clearPhotoPreview();
-    $("tripDialog").close();
-    toast("旅途已儲存");
-    await loadTrips();
-    if (savedId) openTrip(savedId);
-  } catch (error) {
-    console.error("[saveLegacyTrip]", error);
-    toast(error.message || "旅途儲存失敗");
-  }
-}
-
-function isMissingTripPermissionColumn(error) {
-  return error?.code === "PGRST204" || error?.code === "42703";
-}
-
-function isMissingTripExpenseColumn(error) {
-  return isMissingTripPermissionColumn(error) && /expenses?/i.test(error?.message || "");
 }
 
 async function uploadPhoto(tripId, file) {
   const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
   const path = `${state.user.id}/${tripId}/${crypto.randomUUID()}.${ext}`;
-  const { error: uploadError } = await client.storage.from(state.storageBucket).upload(path, file, {
+  const { error: uploadError } = await client.storage.from(bucket).upload(path, file, {
     cacheControl: "3600",
     upsert: false
   });
@@ -2586,9 +600,43 @@ async function rollbackUploadedPhoto(record) {
     }
   }
   if (record.storage_path) {
-    const { error } = await client.storage.from(state.storageBucket).remove([record.storage_path]);
+    const { error } = await client.storage.from(bucket).remove([record.storage_path]);
     if (error) console.error("[rollbackUploadedPhoto.storage]", error, record.storage_path);
   }
+}
+
+async function rollbackUploadedPhotos(records) {
+  for (const record of [...records].reverse()) {
+    await rollbackUploadedPhoto(record);
+  }
+}
+
+async function deletePhoto(photoId, tripId) {
+  const trip = state.trips.find((item) => item.id === tripId);
+  const photo = getTripPhotos(trip).find((item) => item.id === photoId);
+  if (!photo || !confirm("確定要刪除這張照片嗎？")) return;
+
+  const { data, error } = await client
+    .from("trip_photos")
+    .delete()
+    .eq("id", photo.id)
+    .eq("trip_id", trip.id)
+    .select("id");
+  if (error) return toast(error.message);
+  if (!Array.isArray(data) || data.length !== 1) return toast("刪除失敗：找不到這張照片");
+
+  let storageClean = true;
+  if (photo.storage_path) {
+    const { error: storageError } = await client.storage.from(bucket).remove([photo.storage_path]);
+    if (storageError) {
+      console.error("[deletePhoto.storage]", storageError, photo.storage_path);
+      storageClean = false;
+    }
+  }
+
+  await loadTrips();
+  openTrip(tripId);
+  toast(storageClean ? "照片已刪除" : "照片紀錄已刪除，但雲端檔案清理失敗");
 }
 
 async function deleteTripRow(id) {
@@ -2599,7 +647,6 @@ async function deleteTripRow(id) {
 }
 
 async function deleteCurrentTrip() {
-  if (state.sharedMode) return toast("分享檢視不可刪除旅程");
   if (!state.editingTrip) return;
   if (!confirm("確定要刪除這趟旅程嗎？")) return;
 
@@ -2611,7 +658,7 @@ async function deleteCurrentTrip() {
 
   let storageClean = true;
   if (paths.length) {
-    const { error: storageError } = await client.storage.from(state.storageBucket).remove([...new Set(paths)]);
+    const { error: storageError } = await client.storage.from(bucket).remove([...new Set(paths)]);
     if (storageError) {
       console.error("[deleteCurrentTrip.storage]", storageError, paths);
       storageClean = false;
@@ -2620,7 +667,6 @@ async function deleteCurrentTrip() {
 
   $("tripDialog").close();
   closeDrawer();
-  closeTripDetail();
   toast(storageClean ? "已刪除旅途" : "旅途已刪除，但部分照片清理失敗");
   await loadTrips();
 }
@@ -2633,12 +679,6 @@ async function loadSharedTrip(token) {
 
   $("authScreen").hidden = true;
   $("appShell").hidden = false;
-  document.body.classList.add("share-mode");
-  $("homeDiaryBtn").hidden = true;
-  $("homeNewTripBtn").hidden = true;
-  $("mobileBottomNav").hidden = true;
-  $("tripDialog")?.close();
-  $("stopDialog")?.close();
   $("sessionStatus").textContent = "分享檢視";
   setTimeout(() => map.invalidateSize(), 80);
 
@@ -2646,28 +686,17 @@ async function loadSharedTrip(token) {
     body: { share_token: token }
   });
 
-  const sharedTrip = Array.isArray(data) ? data[0] : data;
-  if (error || !sharedTrip?.id || sharedTrip.is_shared !== true) {
-    const errorText = [error?.message, error?.context?.statusText].filter(Boolean).join(" ");
-    if (error) {
-      const status = Number(error.context?.status || error.status || 0);
-      console.error("[loadSharedTrip]", { status, error });
-    }
-    const status = Number(error?.context?.status || error?.status || 0);
-    const missingFunction = status === 404 || /function was not found|requested function/i.test(errorText);
-    const message = missingFunction
-      ? "分享服務尚未部署，或這個分享連結不存在。"
-      : "這個分享連結不存在，或已經關閉。";
-    $("tripList").innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
+  if (error || !data?.id || data.is_shared !== true) {
+    if (error) console.error("[loadSharedTrip]", error);
+    $("tripList").innerHTML = `<div class="empty">這個分享連結不存在，或已經關閉。</div>`;
     return;
   }
 
   state.sharedTrip = {
-    ...sharedTrip,
+    ...data,
     share_token: token,
-    trip_photos: (sharedTrip.photos || sharedTrip.trip_photos || []).filter((photo) => photo.signed_url)
+    trip_photos: (data.photos || []).filter((photo) => photo.signed_url)
   };
-  state.editingTrip = state.sharedTrip;
   state.trips = [state.sharedTrip];
   state.photoUrls = new Map();
   renderTrips();
@@ -2676,9 +705,7 @@ async function loadSharedTrip(token) {
 }
 
 function getCoverUrl(trip) {
-  const photos = getTripPhotos(trip);
-  const coverPhoto = photos.find((photo) => photo.storage_path === trip.cover_path) || photos[0];
-  return coverPhoto?.signed_url || (coverPhoto ? state.photoUrls.get(coverPhoto.storage_path) : "") || "";
+  return getPhotoUrl(getTripPhotos(trip)[0]);
 }
 
 async function downloadCover(trip, sharedMode) {
@@ -2702,56 +729,95 @@ async function downloadCover(trip, sharedMode) {
   }
 }
 
-async function uploadGuestPhoto(event, shareToken) {
-  if (!state.sharedMode || !state.sharedTrip?.can_guest_upload) {
-    event.target.value = "";
-    return toast("分享者沒有開放補照片");
-  }
-  const input = event.target;
-  const file = event.target.files[0];
-  if (!file) return;
-  if (!file.type.startsWith("image/")) return toast("請選擇圖片檔");
+async function uploadGuestPhotos(event, shareToken) {
+  const files = Array.from(event.target.files || []);
+  if (!files.length) return;
+  if (files.length > 20) return toast("一次最多補上 20 張照片");
+  const invalidFile = files.find((file) => !file.type.startsWith("image/") || file.size > 10 * 1024 * 1024);
+  if (invalidFile) return toast(`${invalidFile.name} 不是圖片或超過 10MB`);
 
-  const form = new FormData();
-  form.append("share_token", shareToken);
-  form.append("photo", file);
-
+  event.target.disabled = true;
+  let uploadedCount = 0;
   try {
-    const response = await fetch(`${cfg.SUPABASE_URL}/functions/v1/upload-shared-photo`, {
-      method: "POST",
-      headers: {
-        apikey: cfg.SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${cfg.SUPABASE_ANON_KEY}`
-      },
-      body: form
-    });
+    for (const file of files) {
+      const form = new FormData();
+      form.append("share_token", shareToken);
+      form.append("photo", file);
 
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const missingFunction = response.status === 404 || payload.code === "NOT_FOUND";
-      return toast(missingFunction
-        ? "補照片服務尚未部署，請通知網站管理者"
-        : (payload.error || "上傳失敗"));
+      const response = await fetch(`${cfg.SUPABASE_URL}/functions/v1/upload-shared-photo`, {
+        method: "POST",
+        headers: {
+          apikey: cfg.SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${cfg.SUPABASE_ANON_KEY}`
+        },
+        body: form
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || `${file.name} 上傳失敗`);
+      }
+      uploadedCount += 1;
     }
-
-    toast("照片已補上");
-    await loadSharedTrip(shareToken);
+    toast(`已補上 ${uploadedCount} 張照片`);
   } catch (error) {
-    console.error("[uploadGuestPhoto]", error);
-    toast("補照片服務目前無法連線");
+    console.error("[uploadGuestPhotos]", error);
+    toast(uploadedCount ? `已上傳 ${uploadedCount} 張，其餘失敗` : error.message || "上傳失敗");
   } finally {
-    input.value = "";
+    event.target.disabled = false;
+    event.target.value = "";
+    if (uploadedCount) await loadSharedTrip(shareToken);
   }
 }
 
-async function copyText(text, successMessage = "分享連結已複製") {
-  if (!text) return toast("目前沒有可複製的分享連結");
+function getTripPhotos(trip) {
+  if (!trip) return [];
+  return Array.isArray(trip.trip_photos) ? trip.trip_photos : Array.isArray(trip.photos) ? trip.photos : [];
+}
+
+function getPhotoUrl(photo) {
+  if (!photo) return "";
+  return photo.signed_url || state.photoUrls.get(photo.storage_path) || "";
+}
+
+function getMapUrl(trip) {
+  const lat = numberOrNull(trip.lat);
+  const lng = numberOrNull(trip.lng);
+  if (lat !== null && lng !== null) {
+    return `https://www.openstreetmap.org/?mlat=${encodeURIComponent(lat)}&mlon=${encodeURIComponent(lng)}#map=14/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}`;
+  }
+  return trip.location_name
+    ? `https://www.openstreetmap.org/search?query=${encodeURIComponent(trip.location_name)}`
+    : "";
+}
+
+async function shareTrip(trip, shareUrl) {
+  const details = [trip.location_name, trip.travel_date ? formatDate(trip.travel_date) : ""].filter(Boolean).join(" · ");
+  const payload = {
+    title: trip.title || trip.location_name || "旅行日記",
+    text: details ? `我的旅行地點：${details}` : "我的旅行日記",
+    url: shareUrl
+  };
+
+  if (navigator.share) {
+    try {
+      await navigator.share(payload);
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+      console.error("[shareTrip]", error);
+    }
+  }
+  await copyText(`${payload.text}\n${shareUrl}`);
+}
+
+async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
-    toast(successMessage);
+    toast("分享連結已複製");
   } catch (error) {
     console.error("[copyText]", error);
-    toast(`${successMessage.replace("已複製", "已開啟，但無法自動複製")}，請手動複製連結`);
+    toast("無法自動複製，請手動複製連結");
   }
 }
 
@@ -2768,20 +834,6 @@ function parseTags(value) {
 function formatDate(value) {
   const [year, month, day] = value.split("-");
   return `${year}年${Number(month)}月${Number(day)}日`;
-}
-
-function formatDateRange(start, end) {
-  if (!start) return "尚未記錄日期";
-  if (!end || start === end) return formatDate(start);
-  return `${formatDate(start)} — ${formatDate(end)}`;
-}
-
-function formatTripDays(start, end) {
-  if (!start) return "—";
-  const startDate = new Date(`${start}T00:00:00`);
-  const endDate = new Date(`${end || start}T00:00:00`);
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return "—";
-  return `${Math.max(1, Math.round((endDate - startDate) / 86400000) + 1)} 天`;
 }
 
 function escapeHtml(value) {
