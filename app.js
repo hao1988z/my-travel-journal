@@ -3,6 +3,8 @@ const missingConfig = !cfg.SUPABASE_URL || cfg.SUPABASE_URL.includes("YOUR_PROJE
 const client = missingConfig ? null : supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 const bucket = cfg.PHOTO_BUCKET || "trip-photos";
 const authRedirectUrl = cfg.AUTH_REDIRECT_URL || new URL("./", window.location.href).toString();
+const MAX_UPLOAD_FILES = 100;
+const UPLOAD_BATCH_SIZE = 3;
 
 const state = {
   user: null,
@@ -15,7 +17,12 @@ const state = {
   pendingEmail: "",
   resendTimer: null,
   sharedMode: false,
-  sharedTrip: null
+  sharedTrip: null,
+  downloadSelection: new Set(),
+  lightboxTrip: null,
+  lightboxPhotos: [],
+  lightboxIndex: 0,
+  lightboxSharedMode: false
 };
 
 const $ = (id) => document.getElementById(id);
@@ -74,6 +81,14 @@ function bindEvents() {
   $("deleteTripBtn").addEventListener("click", deleteCurrentTrip);
   $("photoInput").addEventListener("change", handlePhotoInput);
   $("searchInput").addEventListener("input", renderTrips);
+  $("closeLightboxBtn").addEventListener("click", closePhotoLightbox);
+  $("previousPhotoBtn").addEventListener("click", () => moveLightbox(-1));
+  $("nextPhotoBtn").addEventListener("click", () => moveLightbox(1));
+  $("lightboxDownloadBtn").addEventListener("click", downloadLightboxPhoto);
+  $("photoLightbox").addEventListener("click", (event) => {
+    if (event.target === $("photoLightbox")) closePhotoLightbox();
+  });
+  document.addEventListener("keydown", handleLightboxKeyboard);
 }
 
 function setupResendButton() {
@@ -336,22 +351,47 @@ function renderDrawer(trip, sharedMode) {
   const mapUrl = getMapUrl(trip);
   const tags = (trip.tags || []).map((tag) => `<span class="chip">${escapeHtml(tag)}</span>`).join("");
   const photos = getTripPhotos(trip).filter((photo) => getPhotoUrl(photo));
+  const canDownload = !sharedMode || trip.can_download;
+  state.downloadSelection.clear();
   const photoGallery = photos.length
-    ? `<div class="photo-gallery">${photos.map((photo) => `
+    ? `<div class="photo-gallery">${photos.map((photo, index) => `
         <figure class="photo-tile">
-          <img src="${escapeHtml(getPhotoUrl(photo))}" alt="${escapeHtml(photo.caption || trip.location_name)}">
+          <button class="photo-open-btn" type="button" data-photo-index="${index}" aria-label="放大第 ${index + 1} 張照片">
+            <img src="${escapeHtml(getPhotoUrl(photo))}" alt="${escapeHtml(photo.caption || trip.location_name)}">
+            <span class="photo-zoom-badge" aria-hidden="true">放大</span>
+          </button>
+          ${canDownload ? `
+            <label class="photo-select-control" title="選取第 ${index + 1} 張照片">
+              <input type="checkbox" data-download-photo-index="${index}">
+              <span aria-hidden="true">✓</span>
+            </label>
+          ` : ""}
           ${!sharedMode ? `<button class="photo-delete-btn" type="button" data-photo-id="${escapeHtml(photo.id)}">刪除</button>` : ""}
         </figure>
       `).join("")}</div>`
     : "";
-  const photoButtons = photos.length
-    ? `<button class="btn btn-soft" id="downloadPhotoBtn">${sharedMode && !trip.can_download ? "不可下載" : "下載第一張"}</button>`
+  const downloadPanel = photos.length && canDownload
+    ? `
+      <div class="photo-download-panel">
+        <div>
+          <strong>儲存照片</strong>
+          <span id="downloadSelectionStatus">尚未選擇照片</span>
+        </div>
+        <div class="photo-download-actions">
+          <button class="btn btn-soft" type="button" id="selectAllPhotosBtn">全選</button>
+          <button class="btn btn-ghost" type="button" id="clearPhotoSelectionBtn">取消選取</button>
+          <button class="btn btn-primary" type="button" id="downloadSelectedPhotosBtn" disabled>下載所選</button>
+        </div>
+      </div>
+    `
     : "";
   const guestUpload = sharedMode && trip.can_guest_upload
     ? `
       <label class="guest-upload">
-        朋友補照片（可多選）
+        朋友補照片（一次可選 1～100 張）
         <input type="file" id="guestPhotoInput" accept="image/*" multiple>
+        <span class="photo-help">選取後會直接上傳，請保持頁面開啟直到完成。</span>
+        <span class="guest-upload-status" id="guestUploadStatus" hidden></span>
       </label>
     `
     : "";
@@ -359,6 +399,7 @@ function renderDrawer(trip, sharedMode) {
   $("drawerTitle").textContent = trip.title || trip.location_name;
   $("drawerBody").innerHTML = `
     ${photoGallery}
+    ${downloadPanel}
     <div class="location-card">
       <div><span>旅行地點</span><strong>${escapeHtml(trip.location_name)}</strong></div>
       ${mapUrl ? `<a class="location-link" href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener noreferrer">在地圖查看</a>` : ""}
@@ -373,7 +414,6 @@ function renderDrawer(trip, sharedMode) {
     <div class="drawer-actions">
       ${!sharedMode ? `<button class="btn btn-primary" id="editTripBtn">編輯</button>` : ""}
       ${!sharedMode && trip.is_shared && shareUrl ? `<button class="btn btn-soft" id="shareTripBtn">分享旅程</button>` : ""}
-      ${photoButtons}
     </div>
     ${guestUpload}
     ${!sharedMode && trip.is_shared
@@ -386,8 +426,19 @@ function renderDrawer(trip, sharedMode) {
   $("detailDrawer").hidden = false;
   $("editTripBtn")?.addEventListener("click", () => openTripDialog(trip));
   $("shareTripBtn")?.addEventListener("click", () => shareTrip(trip, shareUrl));
-  $("downloadPhotoBtn")?.addEventListener("click", () => downloadCover(trip, sharedMode));
   $("guestPhotoInput")?.addEventListener("change", (event) => uploadGuestPhotos(event, trip.share_token));
+  $("drawerBody").querySelectorAll(".photo-open-btn").forEach((button) => {
+    button.addEventListener("click", () => openPhotoLightbox(trip, sharedMode, Number(button.dataset.photoIndex)));
+  });
+  $("drawerBody").querySelectorAll("[data-download-photo-index]").forEach((input) => {
+    input.addEventListener("change", () => updateDownloadSelection(photos));
+  });
+  $("selectAllPhotosBtn")?.addEventListener("click", () => selectAllPhotos(photos));
+  $("clearPhotoSelectionBtn")?.addEventListener("click", () => clearDownloadSelection(photos));
+  $("downloadSelectedPhotosBtn")?.addEventListener("click", (event) => {
+    const selected = photos.filter((photo, index) => state.downloadSelection.has(getPhotoSelectionKey(photo, index)));
+    downloadPhotos(selected, trip, event.currentTarget);
+  });
   $("drawerBody").querySelectorAll(".photo-delete-btn").forEach((button) => {
     button.addEventListener("click", () => deletePhoto(button.dataset.photoId, trip.id));
   });
@@ -449,10 +500,6 @@ function clearPhotoPreview() {
 function handlePhotoInput(event) {
   const files = Array.from(event.target.files || []);
   if (!files.length) return;
-  if (files.length > 30) {
-    event.target.value = "";
-    return toast("一次最多選擇 30 張照片");
-  }
 
   const invalidFile = files.find((file) => !file.type.startsWith("image/") || file.size > 10 * 1024 * 1024);
   if (invalidFile) {
@@ -461,8 +508,14 @@ function handlePhotoInput(event) {
   }
 
   const unique = new Map();
+  state.selectedPhotos.forEach((file) => unique.set(`${file.name}:${file.size}:${file.lastModified}:${file.type}`, file));
   files.forEach((file) => unique.set(`${file.name}:${file.size}:${file.lastModified}:${file.type}`, file));
+  if (unique.size > MAX_UPLOAD_FILES) {
+    event.target.value = "";
+    return toast(`一次最多選擇 ${MAX_UPLOAD_FILES} 張照片，目前已選 ${state.selectedPhotos.length} 張`);
+  }
   state.selectedPhotos = [...unique.values()];
+  event.target.value = "";
   renderSelectedPhotoPreviews();
 }
 
@@ -525,12 +578,9 @@ async function saveTrip(event) {
       savedTrip = data;
     }
 
-    for (const [index, file] of state.selectedPhotos.entries()) {
-      saveButton.textContent = `上傳中 ${index + 1}/${state.selectedPhotos.length}`;
-      const result = await uploadPhoto(savedTrip.id, file);
-      uploadedPhotos.push(result.record);
-      if (result.error) throw result.error;
-    }
+    await uploadPhotosInBatches(savedTrip.id, state.selectedPhotos, uploadedPhotos, (completed, total) => {
+      saveButton.textContent = `上傳中 ${completed}/${total}`;
+    });
 
     if (trip) {
       const { data, error } = await client
@@ -585,6 +635,21 @@ async function uploadPhoto(tripId, file) {
     .single();
   if (insertError) return { record, error: insertError };
   return { record: data, error: null };
+}
+
+async function uploadPhotosInBatches(tripId, files, uploadedPhotos, onProgress) {
+  let completed = 0;
+  for (let index = 0; index < files.length; index += UPLOAD_BATCH_SIZE) {
+    const batch = files.slice(index, index + UPLOAD_BATCH_SIZE);
+    const results = await Promise.all(batch.map((file) => uploadPhoto(tripId, file)));
+    results.forEach((result) => {
+      uploadedPhotos.push(result.record);
+      completed += 1;
+      onProgress?.(completed, files.length);
+    });
+    const failed = results.find((result) => result.error);
+    if (failed) throw failed.error;
+  }
 }
 
 async function rollbackUploadedPhoto(record) {
@@ -708,56 +773,222 @@ function getCoverUrl(trip) {
   return getPhotoUrl(getTripPhotos(trip)[0]);
 }
 
-async function downloadCover(trip, sharedMode) {
-  if (sharedMode && !trip.can_download) return toast("分享者沒有開放下載");
-  const cover = getCoverUrl(trip);
-  if (!cover) return;
-  try {
-    const response = await fetch(cover);
-    if (!response.ok) throw new Error(`照片下載失敗：HTTP ${response.status}`);
-    const blobUrl = URL.createObjectURL(await response.blob());
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = `${(trip.title || trip.location_name || "travel-photo").replace(/[\\/:*?"<>|]+/g, "-")}.jpg`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-  } catch (error) {
-    console.error("[downloadCover]", error);
-    toast("照片下載失敗，請稍後再試");
+function getPhotoSelectionKey(photo, index) {
+  return String(photo.id || photo.storage_path || `${photo.original_name || "photo"}-${index}`);
+}
+
+function updateDownloadSelection(photos) {
+  state.downloadSelection.clear();
+  $("drawerBody").querySelectorAll("[data-download-photo-index]").forEach((input) => {
+    const index = Number(input.dataset.downloadPhotoIndex);
+    if (input.checked && photos[index]) {
+      state.downloadSelection.add(getPhotoSelectionKey(photos[index], index));
+    }
+  });
+
+  const count = state.downloadSelection.size;
+  const status = $("downloadSelectionStatus");
+  const button = $("downloadSelectedPhotosBtn");
+  if (status) status.textContent = count ? `已選擇 ${count} 張` : "尚未選擇照片";
+  if (button) {
+    button.disabled = count === 0;
+    button.textContent = count ? `下載所選（${count}）` : "下載所選";
   }
+}
+
+function selectAllPhotos(photos) {
+  $("drawerBody").querySelectorAll("[data-download-photo-index]").forEach((input) => {
+    input.checked = true;
+  });
+  updateDownloadSelection(photos);
+}
+
+function clearDownloadSelection(photos) {
+  $("drawerBody").querySelectorAll("[data-download-photo-index]").forEach((input) => {
+    input.checked = false;
+  });
+  updateDownloadSelection(photos);
+}
+
+function openPhotoLightbox(trip, sharedMode, index) {
+  const photos = getTripPhotos(trip).filter((photo) => getPhotoUrl(photo));
+  if (!photos.length) return;
+  state.lightboxTrip = trip;
+  state.lightboxPhotos = photos;
+  state.lightboxIndex = Math.min(Math.max(index, 0), photos.length - 1);
+  state.lightboxSharedMode = sharedMode;
+  renderPhotoLightbox();
+  if (!$("photoLightbox").open) $("photoLightbox").showModal();
+}
+
+function renderPhotoLightbox() {
+  const photo = state.lightboxPhotos[state.lightboxIndex];
+  if (!photo || !state.lightboxTrip) return;
+  const total = state.lightboxPhotos.length;
+  $("lightboxCounter").textContent = `${state.lightboxIndex + 1} / ${total}`;
+  $("lightboxImage").src = getPhotoUrl(photo);
+  $("lightboxImage").alt = photo.caption || state.lightboxTrip.location_name || "旅行照片";
+  $("lightboxCaption").textContent = photo.caption || photo.original_name || state.lightboxTrip.location_name || "";
+  $("previousPhotoBtn").hidden = total < 2;
+  $("nextPhotoBtn").hidden = total < 2;
+  $("lightboxDownloadBtn").hidden = state.lightboxSharedMode && !state.lightboxTrip.can_download;
+}
+
+function moveLightbox(offset) {
+  const total = state.lightboxPhotos.length;
+  if (total < 2) return;
+  state.lightboxIndex = (state.lightboxIndex + offset + total) % total;
+  renderPhotoLightbox();
+}
+
+function handleLightboxKeyboard(event) {
+  if (!$("photoLightbox").open) return;
+  if (event.key === "ArrowLeft") moveLightbox(-1);
+  if (event.key === "ArrowRight") moveLightbox(1);
+}
+
+function closePhotoLightbox() {
+  if ($("photoLightbox").open) $("photoLightbox").close();
+  $("lightboxImage").removeAttribute("src");
+}
+
+async function downloadLightboxPhoto(event) {
+  const photo = state.lightboxPhotos[state.lightboxIndex];
+  if (!photo || !state.lightboxTrip) return;
+  await downloadPhotos([photo], state.lightboxTrip, event.currentTarget);
+}
+
+async function downloadPhotos(photos, trip, sourceButton) {
+  if (!photos.length) return toast("請先選擇照片");
+  if (state.sharedMode && !trip.can_download) return toast("分享者沒有開放下載");
+
+  const originalText = sourceButton?.textContent || "下載";
+  if (sourceButton) sourceButton.disabled = true;
+  try {
+    const files = await fetchPhotoFiles(photos, trip, (completed, total) => {
+      if (sourceButton) sourceButton.textContent = `準備中 ${completed}/${total}`;
+    });
+
+    const shareData = {
+      title: trip.title || trip.location_name || "旅行照片",
+      files
+    };
+    if (isMobileDevice() && navigator.share && navigator.canShare?.(shareData)) {
+      try {
+        await navigator.share(shareData);
+        toast(files.length > 1 ? "已開啟手機的多張儲存選單" : "已開啟手機儲存選單");
+        return;
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+        console.error("[downloadPhotos.share]", error);
+      }
+    }
+
+    if (files.length === 1) {
+      triggerBlobDownload(files[0], files[0].name);
+      toast("照片已開始下載");
+      return;
+    }
+
+    if (!window.JSZip) throw new Error("多張照片打包元件尚未載入");
+    if (sourceButton) sourceButton.textContent = "正在打包 ZIP";
+    const zip = new JSZip();
+    files.forEach((file) => zip.file(file.name, file));
+    const archive = await zip.generateAsync({ type: "blob", compression: "STORE" });
+    const archiveName = `${sanitizeFileName(trip.title || trip.location_name || "travel-photos")}.zip`;
+    triggerBlobDownload(archive, archiveName);
+    toast(`已將 ${files.length} 張照片打包下載`);
+  } catch (error) {
+    console.error("[downloadPhotos]", error);
+    toast(error.message || "照片下載失敗，請稍後再試");
+  } finally {
+    if (sourceButton) {
+      sourceButton.disabled = false;
+      sourceButton.textContent = originalText;
+    }
+  }
+}
+
+async function fetchPhotoFiles(photos, trip, onProgress) {
+  const files = [];
+  const usedNames = new Set();
+  for (const [index, photo] of photos.entries()) {
+    const response = await fetch(getPhotoUrl(photo));
+    if (!response.ok) throw new Error(`第 ${index + 1} 張照片下載失敗：HTTP ${response.status}`);
+    const blob = await response.blob();
+    const requestedName = photo.original_name || `${trip.title || trip.location_name || "travel-photo"}-${index + 1}.${extensionFromMime(blob.type)}`;
+    const name = uniqueDownloadName(sanitizeFileName(requestedName), usedNames);
+    files.push(new File([blob], name, { type: blob.type || "image/jpeg" }));
+    onProgress?.(index + 1, photos.length);
+  }
+  return files;
+}
+
+function uniqueDownloadName(name, usedNames) {
+  let candidate = name || "travel-photo.jpg";
+  let suffix = 2;
+  const dot = candidate.lastIndexOf(".");
+  const base = dot > 0 ? candidate.slice(0, dot) : candidate;
+  const ext = dot > 0 ? candidate.slice(dot) : "";
+  while (usedNames.has(candidate.toLowerCase())) {
+    candidate = `${base}-${suffix}${ext}`;
+    suffix += 1;
+  }
+  usedNames.add(candidate.toLowerCase());
+  return candidate;
+}
+
+function sanitizeFileName(value) {
+  return String(value || "travel-photo")
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120) || "travel-photo";
+}
+
+function extensionFromMime(type) {
+  if (type === "image/png") return "png";
+  if (type === "image/webp") return "webp";
+  if (type === "image/heic" || type === "image/heif") return "heic";
+  return "jpg";
+}
+
+function triggerBlobDownload(blob, filename) {
+  const blobUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+}
+
+function isMobileDevice() {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    || (navigator.maxTouchPoints > 1 && window.innerWidth <= 1180);
 }
 
 async function uploadGuestPhotos(event, shareToken) {
   const files = Array.from(event.target.files || []);
   if (!files.length) return;
-  if (files.length > 20) return toast("一次最多補上 20 張照片");
+  if (files.length > MAX_UPLOAD_FILES) return toast(`一次最多補上 ${MAX_UPLOAD_FILES} 張照片`);
   const invalidFile = files.find((file) => !file.type.startsWith("image/") || file.size > 10 * 1024 * 1024);
   if (invalidFile) return toast(`${invalidFile.name} 不是圖片或超過 10MB`);
 
   event.target.disabled = true;
+  const status = $("guestUploadStatus");
+  status.hidden = false;
+  status.textContent = `準備上傳 ${files.length} 張照片`;
   let uploadedCount = 0;
   try {
-    for (const file of files) {
-      const form = new FormData();
-      form.append("share_token", shareToken);
-      form.append("photo", file);
-
-      const response = await fetch(`${cfg.SUPABASE_URL}/functions/v1/upload-shared-photo`, {
-        method: "POST",
-        headers: {
-          apikey: cfg.SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${cfg.SUPABASE_ANON_KEY}`
-        },
-        body: form
-      });
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error || `${file.name} 上傳失敗`);
-      }
-      uploadedCount += 1;
+    for (let index = 0; index < files.length; index += UPLOAD_BATCH_SIZE) {
+      const batch = files.slice(index, index + UPLOAD_BATCH_SIZE);
+      const results = await Promise.allSettled(batch.map((file) => uploadGuestPhoto(file, shareToken)));
+      uploadedCount += results.filter((result) => result.status === "fulfilled").length;
+      status.textContent = `上傳中 ${uploadedCount}/${files.length}`;
+      const failed = results.find((result) => result.status === "rejected");
+      if (failed) throw failed.reason;
     }
     toast(`已補上 ${uploadedCount} 張照片`);
   } catch (error) {
@@ -767,6 +998,26 @@ async function uploadGuestPhotos(event, shareToken) {
     event.target.disabled = false;
     event.target.value = "";
     if (uploadedCount) await loadSharedTrip(shareToken);
+  }
+}
+
+async function uploadGuestPhoto(file, shareToken) {
+  const form = new FormData();
+  form.append("share_token", shareToken);
+  form.append("photo", file);
+
+  const response = await fetch(`${cfg.SUPABASE_URL}/functions/v1/upload-shared-photo`, {
+    method: "POST",
+    headers: {
+      apikey: cfg.SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${cfg.SUPABASE_ANON_KEY}`
+    },
+    body: form
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || `${file.name} 上傳失敗`);
   }
 }
 
