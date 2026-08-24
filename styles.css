@@ -340,6 +340,58 @@ input:focus, textarea:focus, select:focus {
 .cover-editor-panel strong { font-family: "Noto Serif TC", serif; }
 .cover-editor-panel span { color: var(--muted); font-size: 12px; }
 
+.share-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f5f0e7;
+}
+
+.share-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.share-panel-head > div { display: grid; gap: 3px; }
+.share-panel-head strong { font-family: "Noto Serif TC", serif; }
+.share-panel-head span { color: var(--muted); font-size: 12px; }
+
+.share-state {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #e6f1ee;
+  color: var(--accent) !important;
+  font-size: 11px !important;
+  font-weight: 700;
+}
+
+.share-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+}
+
+.share-link-row input {
+  min-width: 0;
+  padding: 9px 10px;
+  background: white;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.share-panel-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .photo-gallery {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -920,6 +972,7 @@ input:focus, textarea:focus, select:focus {
   .lightbox-next { right: 8px; }
 
   .cover-editor-panel { align-items: flex-start; flex-direction: column; }
+  .share-link-row { grid-template-columns: 1fr; }
   .cover-picker { width: 100vw; max-width: none; border-radius: 0; }
   .cover-picker-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 14px; }
 

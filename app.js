@@ -341,9 +341,34 @@ function openTrip(id) {
   renderDrawer(trip, state.sharedMode);
 }
 
-function getShareUrl(token) {
-  if (!token || !/^https?:$/.test(location.protocol)) return "";
+function getPublicAppUrl() {
+  const configuredUrl = String(
+    cfg.PUBLIC_APP_URL || "https://hao1988z.github.io/my-travel-journal/"
+  ).trim();
+  if (configuredUrl) {
+    try {
+      const url = new URL(configuredUrl);
+      if (/^https?:$/.test(url.protocol)) {
+        url.search = "";
+        url.hash = "";
+        return url.href.replace(/\/+$/, "");
+      }
+    } catch (error) {
+      console.warn("[share] invalid PUBLIC_APP_URL", error);
+    }
+  }
+
+  if (!/^https?:$/.test(location.protocol)) return "";
   const url = new URL(location.href);
+  url.search = "";
+  url.hash = "";
+  return url.href.replace(/\/+$/, "");
+}
+
+function getShareUrl(token) {
+  const baseUrl = getPublicAppUrl();
+  if (!token || !baseUrl) return "";
+  const url = new URL(baseUrl);
   url.search = `?share=${encodeURIComponent(token)}`;
   url.hash = "";
   return url.href;
@@ -386,7 +411,7 @@ function renderDrawer(trip, sharedMode) {
         ${trip.is_shared && shareUrl
           ? `<div class="share-link-row"><input id="shareUrlInput" type="text" value="${escapeHtml(shareUrl)}" readonly aria-label="分享連結"><button class="btn btn-soft" type="button" id="copyShareLinkBtn">複製連結</button><button class="btn btn-primary" type="button" id="shareTripBtn">分享</button></div>`
           : trip.is_shared
-            ? `<p class="share-panel-note">分享已開啟。請用 HTTP(S) 網址重新開啟網站，才能產生可複製的分享連結。</p>`
+            ? `<p class="share-panel-note">分享已開啟。請在 config.js 設定 PUBLIC_APP_URL，或用 HTTP(S) 網址重新開啟網站。</p>`
             : `<button class="btn btn-primary" type="button" id="enableShareBtn">開啟分享並取得連結</button>`}
       </section>
     `
@@ -1277,7 +1302,7 @@ async function enableShareLink(trip) {
     if (shareUrl) {
       await copyText(shareUrl);
     } else {
-      toast("分享已開啟，請改用 HTTP(S) 網址查看連結");
+      toast("分享已開啟，但尚未設定公開網站網址");
     }
   } catch (error) {
     console.error("[enableShareLink]", error);
