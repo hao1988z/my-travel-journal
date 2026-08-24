@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const photoBucket = Deno.env.get("PHOTO_BUCKET") || "photos";
+const photoBucket = Deno.env.get("PHOTO_BUCKET") || "trip-photos";
 const admin = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false }
 });
@@ -94,6 +94,52 @@ async function loadPhotos(trip: Record<string, unknown>) {
     .filter((photo) => photo.signed_url);
 }
 
+async function loadItinerary(tripId: string) {
+  const daysResult = await admin
+    .from("trip_days")
+    .select("*")
+    .eq("trip_id", tripId)
+    .order("sort_order", { ascending: true })
+    .order("day_number", { ascending: true });
+
+  const daysTableMissing = daysResult.error?.code === "PGRST205" || daysResult.error?.code === "42P01";
+  if (daysTableMissing) return [];
+  if (daysResult.error) {
+    console.error("[get-shared-trip.loadItinerary.days]", daysResult.error);
+    return [];
+  }
+
+  const days = daysResult.data || [];
+  const dayIds = days.map((day) => day.id).filter(Boolean);
+  if (!dayIds.length) return days.map((day) => ({ ...day, trip_stops: [] }));
+
+  const stopsResult = await admin
+    .from("trip_stops")
+    .select("*")
+    .in("day_id", dayIds)
+    .order("sort_order", { ascending: true })
+    .order("arrival_time", { ascending: true, nullsFirst: false });
+
+  const stopsTableMissing = stopsResult.error?.code === "PGRST205" || stopsResult.error?.code === "42P01";
+  if (stopsTableMissing) return days.map((day) => ({ ...day, trip_stops: [] }));
+  if (stopsResult.error) {
+    console.error("[get-shared-trip.loadItinerary.stops]", stopsResult.error);
+    return days.map((day) => ({ ...day, trip_stops: [] }));
+  }
+
+  const stopsByDay = new Map<string, Record<string, unknown>[]>();
+  (stopsResult.data || []).forEach((stop) => {
+    const dayId = String(stop.day_id || "");
+    if (!stopsByDay.has(dayId)) stopsByDay.set(dayId, []);
+    stopsByDay.get(dayId)?.push(stop);
+  });
+
+  return days.map((day) => ({
+    ...day,
+    trip_stops: stopsByDay.get(String(day.id)) || []
+  }));
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
@@ -118,6 +164,7 @@ Deno.serve(async (request) => {
     if (!trip) return jsonResponse({ error: "Shared trip not found" }, 404);
 
     const photos = await loadPhotos(trip);
+    const tripDays = await loadItinerary(String(trip.id));
     const { user_id: _userId, ...safeTrip } = trip;
     const normalizedTrip = {
       ...safeTrip,
@@ -127,6 +174,7 @@ Deno.serve(async (request) => {
       travel_date_end: trip.travel_date_end ?? trip.date_end ?? null,
       photos,
       trip_photos: photos,
+      trip_days: tripDays,
       share_token: token
     };
 
