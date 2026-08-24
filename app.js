@@ -105,6 +105,7 @@ function bindEvents() {
   $("previousPhotoBtn").addEventListener("click", () => moveLightbox(-1));
   $("nextPhotoBtn").addEventListener("click", () => moveLightbox(1));
   $("lightboxDownloadBtn").addEventListener("click", downloadLightboxPhoto);
+  $("lightboxImage").addEventListener("click", toggleLightboxZoom);
   $("photoLightbox").addEventListener("click", (event) => {
     if (event.target === $("photoLightbox")) closePhotoLightbox();
   });
@@ -1221,11 +1222,17 @@ function renderPhotoLightbox() {
   const total = state.lightboxPhotos.length;
   $("lightboxCounter").textContent = `${state.lightboxIndex + 1} / ${total}`;
   $("lightboxImage").src = getPhotoUrl(photo);
+  $("lightboxImage").classList.remove("is-zoomed");
   $("lightboxImage").alt = photo.caption || state.lightboxTrip.location_name || "旅行照片";
   $("lightboxCaption").textContent = photo.original_name || photo.path?.split("/").pop() || photo.caption || state.lightboxTrip.location_name || "";
   $("previousPhotoBtn").hidden = total < 2;
   $("nextPhotoBtn").hidden = total < 2;
   $("lightboxDownloadBtn").hidden = state.lightboxSharedMode && !state.lightboxTrip.can_download;
+}
+
+function toggleLightboxZoom() {
+  if (!$("lightboxImage").src) return;
+  $("lightboxImage").classList.toggle("is-zoomed");
 }
 
 function moveLightbox(offset) {
@@ -1244,6 +1251,7 @@ function handleLightboxKeyboard(event) {
 function closePhotoLightbox() {
   if ($("photoLightbox").open) $("photoLightbox").close();
   $("lightboxImage").removeAttribute("src");
+  $("lightboxImage").classList.remove("is-zoomed");
 }
 
 async function downloadLightboxPhoto(event) {

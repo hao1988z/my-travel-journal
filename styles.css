@@ -891,6 +891,14 @@ input:focus, textarea:focus, select:focus {
   min-height: 0;
   display: block;
   object-fit: contain;
+  cursor: zoom-in;
+  user-select: none;
+  transition: transform 0.2s ease;
+}
+
+.lightbox-stage img.is-zoomed {
+  transform: scale(1.65);
+  cursor: zoom-out;
 }
 
 .lightbox-nav {
