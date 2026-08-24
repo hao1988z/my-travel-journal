@@ -1781,15 +1781,22 @@ async function downloadViewerPhoto() {
 }
 
 async function deleteModernTripPhotoRow(photo, trip) {
-  let query = client.from("trip_photos").delete().eq("trip_id", trip.id);
+  let query = client.from("trip_photos").delete({ count: "exact" }).eq("trip_id", trip.id);
   if (photo.id) query = query.eq("id", photo.id);
   else if (photo.storage_path) query = query.eq("storage_path", photo.storage_path);
   else throw new Error("照片缺少可刪除的資料編號");
 
-  const { data, error } = await query.select("id, storage_path");
+  const { error, count } = await query;
   if (error) throw error;
-  if (!Array.isArray(data) || data.length !== 1) throw new Error("找不到這張照片，可能已被刪除");
-  return data[0];
+  if (count === 0) throw new Error("找不到這張照片，可能已被刪除");
+
+  let verify = client.from("trip_photos").select("id").eq("trip_id", trip.id);
+  if (photo.id) verify = verify.eq("id", photo.id);
+  else verify = verify.eq("storage_path", photo.storage_path);
+  const { data: remaining, error: verifyError } = await verify.limit(1);
+  if (verifyError) throw verifyError;
+  if (Array.isArray(remaining) && remaining.length) throw new Error("照片資料沒有成功刪除");
+  return { id: photo.id, storage_path: photo.storage_path };
 }
 
 async function deleteSelectedDetailPhotos() {
