@@ -445,6 +445,8 @@ function renderDrawer(trip, sharedMode) {
   const mapUrl = getMapUrl(trip);
   const tags = (trip.tags || []).map((tag) => `<span class="chip">${escapeHtml(tag)}</span>`).join("");
   const photos = getTripPhotos(trip).filter((photo) => getPhotoUrl(photo));
+  const coverPhoto = getCoverPhoto(trip);
+  const coverPath = coverPhoto?.storage_path || coverPhoto?.path || "";
   const canDownload = !sharedMode || trip.can_download;
   state.downloadSelection.clear();
   const photoGallery = photos.length
@@ -459,6 +461,11 @@ function renderDrawer(trip, sharedMode) {
               <input type="checkbox" data-download-photo-index="${index}">
               <span aria-hidden="true">✓</span>
             </label>
+          ` : ""}
+          ${!sharedMode ? `
+            <button class="photo-cover-btn${(photo.storage_path || photo.path) === coverPath ? " is-cover" : ""}" type="button" data-photo-cover="${escapeHtml(photo.storage_path || photo.path || "")}">
+              ${(photo.storage_path || photo.path) === coverPath ? "目前封面" : "設為封面"}
+            </button>
           ` : ""}
           ${!sharedMode ? `<button class="photo-delete-btn" type="button" data-photo-id="${escapeHtml(photo.id)}">刪除</button>` : ""}
         </figure>
@@ -539,6 +546,9 @@ function renderDrawer(trip, sharedMode) {
   });
   $("drawerBody").querySelectorAll(".photo-delete-btn").forEach((button) => {
     button.addEventListener("click", () => deletePhoto(button.dataset.photoId, trip.id));
+  });
+  $("drawerBody").querySelectorAll("[data-photo-cover]").forEach((button) => {
+    button.addEventListener("click", () => setTripCover(button.dataset.photoCover, trip.id));
   });
   $("drawerBody").querySelectorAll("[data-stop-delete]").forEach((button) => {
     button.addEventListener("click", () => deleteStop(button.dataset.stopDelete, trip.id));
@@ -996,6 +1006,21 @@ async function deletePhoto(photoId, tripId) {
   const photo = getTripPhotos(trip).find((item) => item.id === photoId);
   if (!photo || !confirm("確定要刪除這張照片嗎？")) return;
 
+  const photoPath = photo.storage_path || photo.path || "";
+  if (trip.cover_path && trip.cover_path === photoPath) {
+    const nextPhoto = getTripPhotos(trip).find((item) => item.id !== photo.id && (item.storage_path || item.path));
+    const { error: coverError } = await client
+      .from("trips")
+      .update({ cover_path: nextPhoto?.storage_path || nextPhoto?.path || null })
+      .eq("id", trip.id)
+      .select("id")
+      .maybeSingle();
+    if (coverError) {
+      console.error("[deletePhoto.cover]", coverError);
+      return toast(coverError.code === "PGRST204" ? "請先完成封面欄位設定，再刪除目前封面" : coverError.message);
+    }
+  }
+
   const { data, error } = await client
     .from("trip_photos")
     .delete()
@@ -1017,6 +1042,29 @@ async function deletePhoto(photoId, tripId) {
   await loadTrips();
   openTrip(tripId);
   toast(storageClean ? "照片已刪除" : "照片紀錄已刪除，但雲端檔案清理失敗");
+}
+
+async function setTripCover(photoPath, tripId) {
+  const trip = state.trips.find((item) => item.id === tripId);
+  const photo = getTripPhotos(trip).find((item) => (item.storage_path || item.path) === photoPath);
+  if (!trip || !photo || !photoPath) return toast("找不到要設定的照片");
+  if (trip.cover_path === photoPath) return toast("這張照片已是目前封面");
+
+  const { data, error } = await client
+    .from("trips")
+    .update({ cover_path: photoPath })
+    .eq("id", trip.id)
+    .select("id, cover_path")
+    .maybeSingle();
+  if (error) {
+    console.error("[setTripCover]", error);
+    return toast(error.code === "PGRST204" ? "請先在 Supabase 執行 cover_path migration" : `封面更新失敗：${error.message}`);
+  }
+  if (!data?.id) return toast("封面更新失敗：旅程沒有成功更新");
+
+  await loadTrips();
+  openTrip(tripId);
+  toast("已設為相簿封面");
 }
 
 async function deleteTripRow(id) {
@@ -1085,7 +1133,16 @@ async function loadSharedTrip(token) {
 }
 
 function getCoverUrl(trip) {
-  return getPhotoUrl(getTripPhotos(trip)[0]);
+  return getPhotoUrl(getCoverPhoto(trip));
+}
+
+function getCoverPhoto(trip) {
+  const photos = getTripPhotos(trip);
+  if (trip?.cover_path) {
+    const selected = photos.find((photo) => (photo.storage_path || photo.path) === trip.cover_path);
+    if (selected && getPhotoUrl(selected)) return selected;
+  }
+  return photos.find((photo) => getPhotoUrl(photo)) || null;
 }
 
 function getPhotoSelectionKey(photo, index) {
