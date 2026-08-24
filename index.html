@@ -129,6 +129,7 @@
         <div class="detail-toolbar-actions">
           <span class="detail-privacy" id="detailPrivacy">私人</span>
           <button class="btn btn-soft" id="detailDownloadBtn" type="button">下載封面</button>
+          <button class="btn btn-soft" id="detailSetCoverBtn" type="button">編輯封面</button>
           <button class="btn btn-primary" id="detailEditBtn" type="button">編輯旅途</button>
         </div>
       </div>
@@ -274,6 +275,7 @@
         <p class="photo-viewer-counter" id="photoViewerCounter"></p>
       </div>
       <div class="photo-viewer-actions">
+        <button class="btn btn-soft" id="photoViewerCoverBtn" type="button">設為封面</button>
         <button class="btn btn-danger" id="photoViewerDeleteBtn" type="button">刪除照片</button>
         <button class="btn btn-soft" id="photoViewerDownloadBtn" type="button">下載照片</button>
       </div>
@@ -380,9 +382,10 @@
         <label><input type="checkbox" id="guestUploadInput"> 允許分享對象補照片</label>
       </fieldset>
 
+      <p class="trip-form-status" id="tripFormStatus" aria-live="polite"></p>
       <div class="dialog-actions">
         <button class="btn btn-soft" type="button" id="deleteTripBtn" hidden>刪除</button>
-        <button class="btn btn-primary" type="submit">儲存</button>
+        <button class="btn btn-primary" id="saveTripBtn" type="submit">儲存</button>
       </div>
     </form>
   </dialog>
@@ -524,6 +527,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="./config.js?v=20260818-old-project"></script>
-  <script src="./app.js?v=20260824-delete-fix-2"></script>
+  <script src="./app.js?v=20260824-cover-editor-2"></script>
 </body>
 </html>

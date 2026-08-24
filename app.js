@@ -17,6 +17,7 @@ const state = {
   photoUrlRequests: new Map(),
   markers: new Map(),
   editingTrip: null,
+  isSavingTrip: false,
   selectedPhotos: [],
   photoPreviewUrls: [],
   pendingEmail: "",
@@ -104,10 +105,12 @@ function bindEvents() {
   $("detailDownloadBtn").addEventListener("click", () => {
     if (state.editingTrip) downloadCover(state.editingTrip, state.sharedMode);
   });
+  $("detailSetCoverBtn").addEventListener("click", openCoverEditor);
   $("photoViewerCloseBtn").addEventListener("click", closePhotoViewer);
   $("photoViewerPrevBtn").addEventListener("click", () => changePhotoViewer(-1));
   $("photoViewerNextBtn").addEventListener("click", () => changePhotoViewer(1));
   $("photoViewerDownloadBtn").addEventListener("click", downloadViewerPhoto);
+  $("photoViewerCoverBtn").addEventListener("click", setViewerPhotoAsCover);
   $("photoViewerDeleteBtn").addEventListener("click", deleteViewerPhoto);
  ["detailRecentPhotos", "detailAllPhotos"].forEach((id) => {
    const container = $(id);
@@ -128,6 +131,9 @@ function bindEvents() {
   $("searchStopLocationBtn").addEventListener("click", searchStopLocation);
   $("pickStopOnMapBtn").addEventListener("click", pickStopOnMap);
   $("tripForm").addEventListener("submit", saveTrip);
+  $("tripDialog").addEventListener("cancel", (event) => {
+    if (state.isSavingTrip) event.preventDefault();
+  });
   $("deleteTripBtn").addEventListener("click", deleteCurrentTrip);
   $("photoInput").addEventListener("change", handlePhotoInput);
   $("photoPreviewGrid").addEventListener("click", handlePhotoPreviewClick);
@@ -1256,6 +1262,10 @@ function renderTripDetail(trip) {
   $("detailHeroMeta").textContent = [dateLabel, mood, ...tags].filter(Boolean).join("  ·  ");
   $("detailPrivacy").textContent = trip.is_shared ? "已開啟分享" : "私人旅途";
   $("detailDownloadBtn").hidden = !cover;
+  const coverEditorButton = $("detailSetCoverBtn");
+  if (coverEditorButton) {
+    coverEditorButton.hidden = state.sharedMode || !state.user || photos.length === 0;
+  }
 
   $("detailDays").textContent = formatTripDays(dateStart, dateEnd);
   $("detailPhotoCount").textContent = photos.length;
@@ -1297,6 +1307,15 @@ function renderTripDetail(trip) {
 
 function getTripPhotos(trip) {
   return trip?.trip_photos || trip?.photos || [];
+}
+
+function openCoverEditor() {
+  const trip = state.editingTrip;
+  if (state.sharedMode || !state.user || !trip) return;
+  const photos = getTripPhotos(trip);
+  if (!photos.length) return toast("這趟旅程目前沒有照片");
+  const coverIndex = photos.findIndex((photo) => photo.storage_path === trip.cover_path);
+  openPhotoViewer(coverIndex >= 0 ? coverIndex : 0);
 }
 
 function getTripDiaryRecords(trip) {
@@ -1754,6 +1773,13 @@ function renderPhotoViewer() {
   $("photoViewerPrevBtn").hidden = state.viewerPhotos.length < 2;
   $("photoViewerNextBtn").hidden = state.viewerPhotos.length < 2;
   $("photoViewerDownloadBtn").hidden = !url || (state.sharedMode && !state.editingTrip?.can_download);
+  const coverButton = $("photoViewerCoverBtn");
+  const canSetCover = !state.sharedMode && !!state.user && !!photo.storage_path;
+  if (coverButton) {
+    coverButton.hidden = !canSetCover;
+    coverButton.disabled = !canSetCover || photo.storage_path === state.editingTrip?.cover_path;
+    coverButton.textContent = photo.storage_path === state.editingTrip?.cover_path ? "目前封面" : "設為封面";
+  }
   $("photoViewerDeleteBtn").hidden = state.sharedMode || !state.user;
 }
 
@@ -1778,6 +1804,50 @@ async function downloadViewerPhoto() {
     return toast("分享者沒有開放下載");
   }
   await downloadPhotoFile(photo);
+}
+
+async function setViewerPhotoAsCover() {
+  const trip = state.editingTrip;
+  const photo = state.viewerPhotos[state.viewerIndex];
+  if (state.sharedMode || !state.user || !trip || !photo) return;
+  if (!photo.storage_path) return toast("這張照片沒有可使用的檔案路徑");
+  if (photo.storage_path === trip.cover_path) return;
+
+  const button = $("photoViewerCoverBtn");
+  if (button) {
+    button.disabled = true;
+    button.textContent = "儲存中…";
+  }
+
+  try {
+    const { data, error } = await client
+      .from("trips")
+      .update({ cover_path: photo.storage_path })
+      .eq("id", trip.id)
+      .select("id,cover_path")
+      .single();
+    if (error) throw error;
+    if (!data?.id || data.cover_path !== photo.storage_path) {
+      throw new Error("封面設定沒有成功保存");
+    }
+
+    trip.cover_path = data.cover_path;
+    const currentTrip = state.trips.find((item) => String(item.id) === String(trip.id));
+    if (currentTrip) currentTrip.cover_path = data.cover_path;
+    renderPhotoViewer();
+    renderTrips();
+    refreshMarkers();
+    renderTripDetail(trip);
+    toast("已設定為旅程封面");
+  } catch (error) {
+    console.error("[setViewerPhotoAsCover]", error);
+    if (error?.code === "PGRST204" || error?.code === "42703") {
+      toast("設定封面失敗：請先在 Supabase 執行 20260824_cover_path.sql");
+    } else {
+      toast(`設定封面失敗：${error.message || "請稍後再試"}`);
+    }
+    renderPhotoViewer();
+  }
 }
 
 async function deleteModernTripPhotoRow(photo, trip) {
@@ -2446,6 +2516,7 @@ function closeDrawer() {
 }
 
 function closeTripDialog() {
+  if (state.isSavingTrip) return toast("照片正在上傳，請稍候完成");
   clearPhotoPreview();
   $("tripDialog").close();
 }
@@ -2822,6 +2893,8 @@ async function handlePhotoInput(event) {
   const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith("image/"));
   event.target.value = "";
   if (!files.length) return toast("請選擇圖片檔");
+  const invalidFile = files.find((file) => file.size > 10 * 1024 * 1024);
+  if (invalidFile) return toast(`${invalidFile.name} 超過 10MB，請壓縮或移除後再試`);
   const existing = new Set(state.selectedPhotos.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
   const available = files.filter((file) => {
     const key = `${file.name}:${file.size}:${file.lastModified}`;
@@ -2840,6 +2913,20 @@ async function handlePhotoInput(event) {
     state.photoPreviewUrls.push(URL.createObjectURL(file));
   });
   renderSelectedPhotoPreviews();
+}
+
+function setTripSaveStatus(message) {
+  const status = $("tripFormStatus");
+  if (status) status.textContent = message || "";
+}
+
+function updateTripSaveProgress(done, total, fileName = "") {
+  const button = $("saveTripBtn");
+  const label = total ? `上傳中 ${done}/${total}` : "儲存中…";
+  if (button) button.textContent = label;
+  setTripSaveStatus(total
+    ? `正在上傳第 ${Math.min(done + 1, total)} / ${total} 張${fileName ? `：${fileName}` : ""}`
+    : "正在儲存旅程…");
 }
 
 async function saveTrip(event) {
@@ -2875,15 +2962,29 @@ async function saveTrip(event) {
 
   if (!payload.location_name) return toast("請輸入地點名稱");
 
-  if (state.schemaMode === "legacy") {
-    return saveLegacyTrip(trip, payload);
+  const saveButton = event.submitter || $("saveTripBtn");
+  const originalButtonText = saveButton?.textContent || "儲存";
+  const totalPhotos = state.selectedPhotos.length;
+  if (saveButton) {
+    saveButton.disabled = true;
+    saveButton.textContent = totalPhotos ? `上傳中 0/${totalPhotos}` : "儲存中…";
   }
-
-  let savedTrip = trip;
-  const uploadedPhotos = [];
-  let committed = false;
+  state.isSavingTrip = true;
+  ["photoInput", "closeDialogBtn", "deleteTripBtn"].forEach((id) => {
+    const control = $(id);
+    if (control) control.disabled = true;
+  });
+  setTripSaveStatus(totalPhotos ? `準備上傳 ${totalPhotos} 張照片…` : "正在儲存旅程…");
 
   try {
+    if (state.schemaMode === "legacy") {
+      return await saveLegacyTrip(trip, payload, updateTripSaveProgress);
+    }
+
+    let savedTrip = trip;
+    const uploadedPhotos = [];
+    let committed = false;
+
     if (!trip) {
       const { data, error } = await client.from("trips").insert(payload).select("id").single();
       if (error) throw error;
@@ -2891,10 +2992,13 @@ async function saveTrip(event) {
       savedTrip = data;
     }
 
-    for (const file of state.selectedPhotos) {
+    for (let index = 0; index < state.selectedPhotos.length; index += 1) {
+      const file = state.selectedPhotos[index];
+      updateTripSaveProgress(index, totalPhotos, file.name);
       const result = await uploadPhoto(savedTrip.id, file);
       uploadedPhotos.push(result.record);
       if (result.error) throw result.error;
+      updateTripSaveProgress(index + 1, totalPhotos, file.name);
     }
 
     if (trip) {
@@ -2922,10 +3026,21 @@ async function saveTrip(event) {
       if (!trip && savedTrip?.id) await deleteTripRow(savedTrip.id);
     }
     toast(error.message || "旅途儲存失敗");
+  } finally {
+    state.isSavingTrip = false;
+    if (saveButton) {
+      saveButton.disabled = false;
+      saveButton.textContent = originalButtonText;
+    }
+    ["photoInput", "closeDialogBtn", "deleteTripBtn"].forEach((id) => {
+      const control = $(id);
+      if (control) control.disabled = false;
+    });
+    setTripSaveStatus("");
   }
 }
 
-async function saveLegacyTrip(trip, payload) {
+async function saveLegacyTrip(trip, payload, onProgress = null) {
   const legacyPayload = {
     name: payload.title || payload.location_name,
     location: payload.location_name,
@@ -2995,10 +3110,13 @@ async function saveLegacyTrip(trip, payload) {
       savedId = data?.id;
     }
 
-    for (const file of state.selectedPhotos) {
+    for (let index = 0; index < state.selectedPhotos.length; index += 1) {
+      const file = state.selectedPhotos[index];
+      onProgress?.(index, state.selectedPhotos.length, file.name);
       const result = await uploadLegacyPhoto(savedId, file);
       uploadedPhotos.push(result.record);
       if (result.error) throw result.error;
+      onProgress?.(index + 1, state.selectedPhotos.length, file.name);
     }
 
     if (uploadedPhotos.length) {
