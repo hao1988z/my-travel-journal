@@ -14,6 +14,9 @@ const state = {
   editingTrip: null,
   selectedPhotos: [],
   photoPreviewUrls: [],
+  stopMarkers: new Map(),
+  stopSchemaAvailable: false,
+  stopSchemaError: "",
   pendingEmail: "",
   resendTimer: null,
   sharedMode: false,
@@ -79,6 +82,12 @@ function bindEvents() {
   $("closeDrawerBtn").addEventListener("click", closeDrawer);
   $("tripForm").addEventListener("submit", saveTrip);
   $("deleteTripBtn").addEventListener("click", deleteCurrentTrip);
+  $("closeDayDialogBtn").addEventListener("click", closeDayDialog);
+  $("cancelDayDialogBtn").addEventListener("click", closeDayDialog);
+  $("dayForm").addEventListener("submit", saveDay);
+  $("closeStopDialogBtn").addEventListener("click", closeStopDialog);
+  $("cancelStopDialogBtn").addEventListener("click", closeStopDialog);
+  $("stopForm").addEventListener("submit", saveStop);
   $("photoInput").addEventListener("change", handlePhotoInput);
   $("searchInput").addEventListener("input", renderTrips);
   $("closeLightboxBtn").addEventListener("click", closePhotoLightbox);
@@ -234,9 +243,68 @@ async function loadTrips() {
 
   if (error) return toast(error.message);
   state.trips = data || [];
+  await loadTripStops();
   await hydratePhotoUrls();
   renderTrips();
   refreshMarkers();
+}
+
+async function loadTripStops() {
+  state.stopSchemaAvailable = false;
+  state.stopSchemaError = "";
+  state.trips.forEach((trip) => { trip.trip_days = []; });
+  if (!state.trips.length) return;
+
+  const tripIds = state.trips.map((trip) => trip.id).filter(Boolean);
+  const { data: days, error: daysError } = await client
+    .from("trip_days")
+    .select("*")
+    .in("trip_id", tripIds)
+    .order("sort_order", { ascending: true })
+    .order("day_number", { ascending: true });
+
+  if (daysError) {
+    state.stopSchemaError = daysError.code || daysError.message || "trip_days 讀取失敗";
+    if (daysError.code !== "PGRST205") console.error("[loadTripStops.days]", daysError);
+    return;
+  }
+
+  const dayRows = days || [];
+  const dayIds = dayRows.map((day) => day.id).filter(Boolean);
+  let stopRows = [];
+  if (dayIds.length) {
+    const { data: stops, error: stopsError } = await client
+      .from("trip_stops")
+      .select("*")
+      .in("day_id", dayIds)
+      .order("sort_order", { ascending: true })
+      .order("arrival_time", { ascending: true, nullsFirst: false });
+
+    if (stopsError) {
+      state.stopSchemaError = stopsError.code || stopsError.message || "trip_stops 讀取失敗";
+      if (stopsError.code !== "PGRST205") console.error("[loadTripStops.stops]", stopsError);
+      return;
+    }
+    stopRows = stops || [];
+  }
+
+  const stopsByDay = new Map();
+  stopRows.forEach((stop) => {
+    if (!stopsByDay.has(stop.day_id)) stopsByDay.set(stop.day_id, []);
+    stopsByDay.get(stop.day_id).push(stop);
+  });
+
+  const daysByTrip = new Map();
+  dayRows.forEach((day) => {
+    const normalizedDay = { ...day, trip_stops: stopsByDay.get(day.id) || [] };
+    if (!daysByTrip.has(day.trip_id)) daysByTrip.set(day.trip_id, []);
+    daysByTrip.get(day.trip_id).push(normalizedDay);
+  });
+
+  state.trips.forEach((trip) => {
+    trip.trip_days = daysByTrip.get(trip.id) || [];
+  });
+  state.stopSchemaAvailable = true;
 }
 
 async function hydratePhotoUrls() {
@@ -299,21 +367,47 @@ function renderTrips() {
 function refreshMarkers() {
   state.markers.forEach((marker) => map.removeLayer(marker));
   state.markers.clear();
+  state.stopMarkers.forEach((marker) => map.removeLayer(marker));
+  state.stopMarkers.clear();
 
   const points = [];
   state.trips.forEach((trip) => {
     const lat = numberOrNull(trip.lat);
     const lng = numberOrNull(trip.lng);
-    if (lat === null || lng === null) return;
-    const marker = L.marker([lat, lng], { icon: makeMarkerIcon(trip) }).addTo(map);
-    marker.on("click", () => openTrip(trip.id));
-    state.markers.set(trip.id, marker);
-    points.push([lat, lng]);
+    if (lat !== null && lng !== null) {
+      const marker = L.marker([lat, lng], { icon: makeMarkerIcon(trip) }).addTo(map);
+      marker.on("click", () => openTrip(trip.id));
+      state.markers.set(trip.id, marker);
+      points.push([lat, lng]);
+    }
+
+    getTripStops(trip).forEach((stop, index) => {
+      const stopLat = numberOrNull(stop.lat);
+      const stopLng = numberOrNull(stop.lng);
+      if (stopLat === null || stopLng === null) return;
+      const stopMarker = L.marker([stopLat, stopLng], {
+        icon: makeStopIcon(index + 1),
+        zIndexOffset: 300
+      }).addTo(map);
+      stopMarker.bindTooltip(`${index + 1}. ${stop.name || "地標"}`, { direction: "top" });
+      stopMarker.on("click", () => openTrip(trip.id));
+      state.stopMarkers.set(stop.id, stopMarker);
+      points.push([stopLat, stopLng]);
+    });
   });
 
   if (points.length) {
     map.fitBounds(points, { padding: [44, 44], maxZoom: 8 });
   }
+}
+
+function makeStopIcon(order) {
+  return L.divIcon({
+    className: "stop-marker-wrap",
+    html: `<span class="stop-marker">${escapeHtml(order)}</span>`,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17]
+  });
 }
 
 function makeMarkerIcon(trip) {
@@ -395,11 +489,13 @@ function renderDrawer(trip, sharedMode) {
       </label>
     `
     : "";
+  const itinerary = renderItinerary(trip, sharedMode);
 
   $("drawerTitle").textContent = trip.title || trip.location_name;
   $("drawerBody").innerHTML = `
     ${photoGallery}
     ${downloadPanel}
+    ${itinerary}
     <div class="location-card">
       <div><span>旅行地點</span><strong>${escapeHtml(trip.location_name)}</strong></div>
       ${mapUrl ? `<a class="location-link" href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener noreferrer">在地圖查看</a>` : ""}
@@ -425,6 +521,8 @@ function renderDrawer(trip, sharedMode) {
 
   $("detailDrawer").hidden = false;
   $("editTripBtn")?.addEventListener("click", () => openTripDialog(trip));
+  $("addDayBtn")?.addEventListener("click", () => openDayDialog(trip));
+  $("addStopBtn")?.addEventListener("click", () => openStopDialog(trip));
   $("shareTripBtn")?.addEventListener("click", () => shareTrip(trip, shareUrl));
   $("guestPhotoInput")?.addEventListener("change", (event) => uploadGuestPhotos(event, trip.share_token));
   $("drawerBody").querySelectorAll(".photo-open-btn").forEach((button) => {
@@ -442,6 +540,223 @@ function renderDrawer(trip, sharedMode) {
   $("drawerBody").querySelectorAll(".photo-delete-btn").forEach((button) => {
     button.addEventListener("click", () => deletePhoto(button.dataset.photoId, trip.id));
   });
+  $("drawerBody").querySelectorAll("[data-stop-delete]").forEach((button) => {
+    button.addEventListener("click", () => deleteStop(button.dataset.stopDelete, trip.id));
+  });
+}
+
+function getTripDays(trip) {
+  return Array.isArray(trip?.trip_days)
+    ? [...trip.trip_days].sort((a, b) => Number(a.day_number || 0) - Number(b.day_number || 0))
+    : [];
+}
+
+function getTripStops(trip) {
+  return getTripDays(trip).flatMap((day) => (Array.isArray(day.trip_stops) ? day.trip_stops : []));
+}
+
+function formatStopTime(value) {
+  return value ? String(value).slice(0, 5) : "";
+}
+
+function renderItinerary(trip, sharedMode) {
+  const days = getTripDays(trip);
+  const stopCount = getTripStops(trip).length;
+  const controls = !sharedMode
+    ? `<div class="itinerary-actions">
+        <button class="btn btn-soft btn-small" type="button" id="addDayBtn">＋ 新增旅行日</button>
+        <button class="btn btn-primary btn-small" type="button" id="addStopBtn">＋ 新增地標</button>
+      </div>`
+    : "";
+
+  const body = days.length
+    ? days.map((day) => {
+        const stops = Array.isArray(day.trip_stops) ? day.trip_stops : [];
+        return `<section class="itinerary-day">
+          <header class="itinerary-day-head">
+            <div>
+              <span class="day-label">DAY ${escapeHtml(day.day_number)}</span>
+              <h4>${escapeHtml(day.title || trip.location_name || "旅行日")}</h4>
+              ${day.date ? `<time>${formatDate(day.date)}</time>` : ""}
+            </div>
+            <span>${stops.length} 個地標</span>
+          </header>
+          <div class="itinerary-stop-list">
+            ${stops.length ? stops.map((stop, index) => `
+              <article class="itinerary-stop">
+                <span class="itinerary-stop-order">${index + 1}</span>
+                <div class="itinerary-stop-body">
+                  <div class="itinerary-stop-title">
+                    <strong>${escapeHtml(stop.name)}</strong>
+                    ${stop.arrival_time ? `<time>${formatStopTime(stop.arrival_time)}</time>` : ""}
+                  </div>
+                  ${stop.address ? `<p>${escapeHtml(stop.address)}</p>` : ""}
+                  ${stop.note ? `<small>${escapeHtml(stop.note)}</small>` : ""}
+                  ${stop.category || stop.mood ? `<span class="itinerary-stop-meta">${escapeHtml([stop.category, stop.mood].filter(Boolean).join(" · "))}</span>` : ""}
+                </div>
+                <div class="itinerary-stop-actions">
+                  ${numberOrNull(stop.lat) !== null && numberOrNull(stop.lng) !== null
+                    ? `<a class="location-link" href="${escapeHtml(getMapUrl(stop))}" target="_blank" rel="noopener noreferrer">地圖 →</a>`
+                    : ""}
+                  ${!sharedMode ? `<button class="text-danger" type="button" data-stop-delete="${escapeHtml(stop.id)}">刪除</button>` : ""}
+                </div>
+              </article>
+            `).join("") : `<p class="itinerary-day-empty">這一天還沒有地標。</p>`}
+          </div>
+        </section>`;
+      }).join("")
+    : `<div class="itinerary-empty">
+        <strong>還沒有每日行程</strong>
+        <p>${state.stopSchemaError ? "請確認已在目前 Supabase 專案執行 trip_days／trip_stops migration。" : "新增旅行日後，就能在同一天加入多個地標。"}</p>
+      </div>`;
+
+  return `<section class="itinerary-panel">
+    <div class="itinerary-heading">
+      <div><p class="eyebrow">DAY BY DAY</p><h4>每日行程與地標</h4><p class="itinerary-summary">${days.length} 天 · ${stopCount} 個地標</p></div>
+      ${controls}
+    </div>
+    ${body}
+  </section>`;
+}
+
+function closeDayDialog() {
+  if ($("dayDialog").open) $("dayDialog").close();
+}
+
+function closeStopDialog() {
+  if ($("stopDialog").open) $("stopDialog").close();
+}
+
+function openDayDialog(trip = state.editingTrip) {
+  if (!trip) return;
+  if (!state.stopSchemaAvailable) {
+    return toast("請先在目前 Supabase 專案執行 trip_days_stops migration");
+  }
+
+  const days = getTripDays(trip);
+  const nextDay = days.reduce((max, day) => Math.max(max, Number(day.day_number) || 0), 0) + 1;
+  $("dayForm").reset();
+  $("dayNumberInput").value = nextDay;
+  $("dayDateInput").value = trip.travel_date || "";
+  $("dayTitleInput").value = trip.location_name || "";
+  state.editingTrip = trip;
+  $("dayDialog").showModal();
+}
+
+async function saveDay(event) {
+  event.preventDefault();
+  const trip = state.editingTrip;
+  if (!trip) return;
+
+  const dayNumber = Number($("dayNumberInput").value);
+  const title = $("dayTitleInput").value.trim() || trip.location_name || `Day ${dayNumber}`;
+  if (!Number.isInteger(dayNumber) || dayNumber < 1) return toast("Day 必須是大於 0 的整數");
+  if (getTripDays(trip).some((day) => Number(day.day_number) === dayNumber)) {
+    return toast(`Day ${dayNumber} 已經存在`);
+  }
+
+  const saveButton = $("saveDayBtn");
+  saveButton.disabled = true;
+  try {
+    const { error } = await client.from("trip_days").insert({
+      trip_id: trip.id,
+      day_number: dayNumber,
+      date: $("dayDateInput").value || null,
+      title,
+      sort_order: dayNumber - 1
+    });
+    if (error) throw error;
+    closeDayDialog();
+    await loadTrips();
+    openTrip(trip.id);
+    toast(`Day ${dayNumber} 已新增`);
+  } catch (error) {
+    console.error("[saveDay]", error);
+    toast(error.message || "旅行日新增失敗");
+  } finally {
+    saveButton.disabled = false;
+  }
+}
+
+function openStopDialog(trip = state.editingTrip) {
+  if (!trip) return;
+  if (!state.stopSchemaAvailable) {
+    return toast("請先在目前 Supabase 專案執行 trip_days_stops migration");
+  }
+
+  const days = getTripDays(trip);
+  if (!days.length) return toast("請先新增旅行日，再加入地標");
+
+  $("stopForm").reset();
+  $("stopDayInput").innerHTML = days.map((day) => `
+    <option value="${escapeHtml(day.id)}">Day ${escapeHtml(day.day_number)}${day.title ? ` · ${escapeHtml(day.title)}` : ""}</option>
+  `).join("");
+  $("stopFormStatus").textContent = "同一天可以重複新增多個地標。";
+  state.editingTrip = trip;
+  $("stopDialog").showModal();
+}
+
+async function saveStop(event) {
+  event.preventDefault();
+  const trip = state.editingTrip;
+  const dayId = $("stopDayInput").value;
+  const name = $("stopNameInput").value.trim();
+  if (!trip || !dayId) return toast("請先選擇旅行日");
+  if (!name) return toast("請輸入地標名稱");
+
+  const day = getTripDays(trip).find((item) => String(item.id) === String(dayId));
+  const payload = {
+    day_id: dayId,
+    name,
+    address: $("stopAddressInput").value.trim() || null,
+    lat: numberOrNull($("stopLatInput").value),
+    lng: numberOrNull($("stopLngInput").value),
+    arrival_time: $("stopArrivalInput").value || null,
+    departure_time: $("stopDepartureInput").value || null,
+    category: $("stopCategoryInput").value || null,
+    mood: $("stopMoodInput").value || null,
+    note: $("stopNoteInput").value.trim() || null,
+    sort_order: day?.trip_stops?.length || 0
+  };
+
+  if ((payload.lat === null) !== (payload.lng === null)) {
+    return toast("緯度與經度請一起填寫");
+  }
+
+  const saveButton = $("saveStopBtn");
+  saveButton.disabled = true;
+  saveButton.textContent = "儲存中";
+  try {
+    const { error } = await client.from("trip_stops").insert(payload);
+    if (error) throw error;
+    closeStopDialog();
+    await loadTrips();
+    openTrip(trip.id);
+    toast("地標已新增");
+  } catch (error) {
+    console.error("[saveStop]", error);
+    toast(error.message || "地標新增失敗");
+  } finally {
+    saveButton.disabled = false;
+    saveButton.textContent = "新增地標";
+  }
+}
+
+async function deleteStop(stopId, tripId) {
+  if (!stopId || !confirm("確定要刪除這個地標嗎？")) return;
+  const { data, error } = await client
+    .from("trip_stops")
+    .delete()
+    .eq("id", stopId)
+    .select("id");
+  if (error) {
+    console.error("[deleteStop]", error);
+    return toast(error.message || "地標刪除失敗");
+  }
+  if (!Array.isArray(data) || data.length !== 1) return toast("刪除失敗：找不到這個地標");
+  await loadTrips();
+  openTrip(tripId);
+  toast("地標已刪除");
 }
 
 function closeDrawer() {

@@ -536,6 +536,115 @@ input:focus, textarea:focus, select:focus {
   margin-top: 18px;
 }
 
+.itinerary-panel {
+  margin: 18px 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.itinerary-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.itinerary-heading h4 {
+  margin: 0;
+  font: 700 19px "Noto Serif TC", serif;
+}
+
+.itinerary-heading .eyebrow { margin: 0 0 4px; }
+.itinerary-summary { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.itinerary-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.btn-small { padding: 8px 10px; font-size: 12px; }
+
+.itinerary-day {
+  overflow: hidden;
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.itinerary-day-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #f7eddc;
+}
+
+.itinerary-day-head h4 { margin: 2px 0 0; font: 700 16px "Noto Serif TC", serif; }
+.itinerary-day-head time { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+.itinerary-day-head > span { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.day-label { color: var(--accent-2); font-size: 10px; font-weight: 700; letter-spacing: .1em; }
+
+.itinerary-stop-list { display: grid; }
+
+.itinerary-stop {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 68px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.itinerary-stop-order {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--accent-2);
+  border-radius: 50%;
+  color: var(--accent-2);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.itinerary-stop-body { min-width: 0; }
+.itinerary-stop-title { display: flex; align-items: baseline; gap: 8px; }
+.itinerary-stop-title strong { overflow-wrap: anywhere; font: 700 14px "Noto Serif TC", serif; }
+.itinerary-stop-title time { color: var(--accent-2); font-size: 11px; font-weight: 700; }
+.itinerary-stop-body p { margin: 3px 0 0; color: var(--muted); font-size: 11px; }
+.itinerary-stop-body small { display: block; margin-top: 4px; color: #46464b; font-size: 11px; white-space: pre-wrap; }
+.itinerary-stop-meta { display: inline-block; margin-top: 4px; color: var(--accent); font-size: 10px; }
+.itinerary-stop-actions { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.text-danger { border: 0; padding: 0; background: transparent; color: var(--danger); cursor: pointer; font: inherit; font-size: 11px; }
+.text-danger:hover { text-decoration: underline; }
+.itinerary-day-empty { margin: 0; padding: 14px; color: var(--muted); font-size: 12px; }
+
+.itinerary-empty {
+  padding: 20px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: rgba(255,255,255,.5);
+  text-align: center;
+}
+
+.itinerary-empty strong { display: block; font: 700 16px "Noto Serif TC", serif; }
+.itinerary-empty p { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.itinerary-form-status { min-height: 18px; margin: 0; color: var(--accent); font-size: 12px; }
+
+.stop-marker-wrap { border: 0; background: transparent; }
+.stop-marker {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 3px solid white;
+  border-radius: 50%;
+  background: var(--accent-2);
+  color: white;
+  box-shadow: 0 2px 8px rgba(0,0,0,.28);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .trip-dialog {
   width: min(620px, 94vw);
   border: 0;
@@ -817,5 +926,27 @@ input:focus, textarea:focus, select:focus {
 
   .privacy-pill {
     display: none;
+  }
+
+  .itinerary-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .itinerary-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .itinerary-actions .btn { flex: 1 1 0; }
+
+  .itinerary-stop {
+    grid-template-columns: 26px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .itinerary-stop-actions {
+    grid-column: 2;
+    justify-self: start;
   }
 }

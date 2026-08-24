@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=20260824-gallery">
+  <link rel="stylesheet" href="./styles.css?v=20260824-trip-stops">
 </head>
 <body>
   <header class="topbar">
@@ -153,6 +153,119 @@
     </form>
   </dialog>
 
+  <dialog class="trip-dialog itinerary-dialog" id="dayDialog">
+    <form method="dialog" class="trip-form" id="dayForm">
+      <div class="dialog-head">
+        <div><p class="eyebrow">TRAVEL DAY</p><h3>新增旅行日</h3></div>
+        <button class="icon-btn" type="button" id="closeDayDialogBtn" aria-label="關閉">×</button>
+      </div>
+
+      <div class="form-grid">
+        <label>
+          Day
+          <input type="number" id="dayNumberInput" min="1" step="1" required>
+        </label>
+        <label>
+          日期
+          <input type="date" id="dayDateInput">
+        </label>
+      </div>
+
+      <label>
+        今日標題
+        <input type="text" id="dayTitleInput" placeholder="蘇州老城散步">
+      </label>
+
+      <div class="dialog-actions">
+        <button class="btn btn-ghost" type="button" id="cancelDayDialogBtn">取消</button>
+        <button class="btn btn-primary" type="submit" id="saveDayBtn">新增旅行日</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="trip-dialog itinerary-dialog" id="stopDialog">
+    <form method="dialog" class="trip-form" id="stopForm">
+      <div class="dialog-head">
+        <div><p class="eyebrow">TRAVEL STOP</p><h3>新增地標</h3></div>
+        <button class="icon-btn" type="button" id="closeStopDialogBtn" aria-label="關閉">×</button>
+      </div>
+
+      <label>
+        所屬旅行日
+        <select id="stopDayInput" required></select>
+      </label>
+
+      <label>
+        地標名稱
+        <input type="text" id="stopNameInput" placeholder="平江路" required>
+      </label>
+
+      <label>
+        地址
+        <input type="text" id="stopAddressInput" placeholder="可貼上搜尋到的地址">
+      </label>
+
+      <div class="form-grid">
+        <label>
+          抵達時間
+          <input type="time" id="stopArrivalInput">
+        </label>
+        <label>
+          離開時間
+          <input type="time" id="stopDepartureInput">
+        </label>
+      </div>
+
+      <div class="form-grid">
+        <label>
+          緯度
+          <input type="number" id="stopLatInput" step="0.000001" placeholder="31.314">
+        </label>
+        <label>
+          經度
+          <input type="number" id="stopLngInput" step="0.000001" placeholder="120.630">
+        </label>
+      </div>
+
+      <label>
+        類型
+        <select id="stopCategoryInput">
+          <option value="">未分類</option>
+          <option>景點</option>
+          <option>餐廳</option>
+          <option>咖啡</option>
+          <option>住宿</option>
+          <option>交通</option>
+        </select>
+      </label>
+
+      <label>
+        心情
+        <select id="stopMoodInput">
+          <option value="">選一個心情</option>
+          <option>😄 開心</option>
+          <option>😊 放鬆</option>
+          <option>😌 平靜</option>
+          <option>🥰 喜歡</option>
+          <option>😮 驚喜</option>
+          <option>🤩 難忘</option>
+          <option>😴 疲憊</option>
+        </select>
+      </label>
+
+      <label>
+        地標筆記
+        <textarea id="stopNoteInput" rows="4" placeholder="記下這個地方的片段"></textarea>
+      </label>
+
+      <p class="itinerary-form-status" id="stopFormStatus" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button class="btn btn-ghost" type="button" id="cancelStopDialogBtn">取消</button>
+        <button class="btn btn-primary" type="submit" id="saveStopBtn">新增地標</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog class="photo-lightbox" id="photoLightbox" aria-label="照片檢視器">
     <div class="lightbox-shell">
       <div class="lightbox-head">
@@ -177,6 +290,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="./config.js"></script>
-  <script src="./app.js?v=20260824-gallery"></script>
+  <script src="./app.js?v=20260824-trip-stops"></script>
 </body>
 </html>
