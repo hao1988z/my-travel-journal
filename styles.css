@@ -22,6 +22,16 @@ body {
   font-family: "Noto Sans TC", system-ui, sans-serif;
 }
 
+/* A share link is a public viewer, never an authentication entry point. */
+body.shared-mode #authScreen {
+  display: none !important;
+}
+
+body.shared-mode #newTripBtn,
+body.shared-mode #signOutBtn {
+  display: none !important;
+}
+
 button, input, textarea, select { font: inherit; }
 
 .topbar {

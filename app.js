@@ -42,6 +42,7 @@ async function boot() {
   const shareToken = new URLSearchParams(location.search).get("share");
   if (shareToken) {
     state.sharedMode = true;
+    enterSharedMode();
     try {
       await loadSharedTrip(shareToken);
     } catch (error) {
@@ -71,6 +72,15 @@ async function boot() {
   });
 
   if (state.user) await loadTrips();
+}
+
+function enterSharedMode() {
+  document.body.classList.add("shared-mode");
+  $("authScreen").hidden = true;
+  $("appShell").hidden = false;
+  $("newTripBtn").hidden = true;
+  $("signOutBtn").hidden = true;
+  $("sessionStatus").textContent = "分享檢視";
 }
 
 function bindEvents() {
@@ -1119,9 +1129,7 @@ async function loadSharedTrip(token) {
     return;
   }
 
-  $("authScreen").hidden = true;
-  $("appShell").hidden = false;
-  $("sessionStatus").textContent = "分享檢視";
+  enterSharedMode();
   setTimeout(() => map.invalidateSize(), 80);
 
   const { data, error } = await client.functions.invoke("get-shared-trip", {
