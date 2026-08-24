@@ -26,9 +26,10 @@ const state = {
   diaryLoadError: "",
   schemaMode: "modern",
   storageBucket: bucket,
-  viewerPhotos: [],
-  viewerIndex: 0,
-  selectedDownloadIndexes: new Set(),
+ viewerPhotos: [],
+ viewerIndex: 0,
+ selectedDownloadIndexes: new Set(),
+  selectedDeleteIndexes: new Set(),
   locationResults: [],
   stopLocationResults: [],
   stopSchemaAvailable: false,
@@ -108,11 +109,15 @@ function bindEvents() {
   $("photoViewerNextBtn").addEventListener("click", () => changePhotoViewer(1));
   $("photoViewerDownloadBtn").addEventListener("click", downloadViewerPhoto);
   $("photoViewerDeleteBtn").addEventListener("click", deleteViewerPhoto);
-  ["detailRecentPhotos", "detailAllPhotos"].forEach((id) => {
-    const container = $(id);
-    container.addEventListener("click", handleDetailPhotoClick);
-    container.addEventListener("keydown", handleDetailPhotoKeydown);
-  });
+ ["detailRecentPhotos", "detailAllPhotos"].forEach((id) => {
+   const container = $(id);
+   container.addEventListener("click", handleDetailPhotoClick);
+   container.addEventListener("keydown", handleDetailPhotoKeydown);
+    container.addEventListener("change", handleDetailPhotoSelection);
+ });
+  $("selectAllDetailPhotosBtn").addEventListener("click", selectAllDetailPhotos);
+  $("clearDetailPhotoSelectionBtn").addEventListener("click", clearDetailPhotoSelection);
+  $("deleteSelectedDetailPhotosBtn").addEventListener("click", deleteSelectedDetailPhotos);
   document.querySelectorAll("[data-detail-tab]").forEach((button) => {
     button.addEventListener("click", () => setDetailTab(button.dataset.detailTab));
   });
@@ -1230,7 +1235,9 @@ function setDetailTab(tabName) {
 
 function renderTripDetail(trip) {
   state.selectedStopId = null;
+  state.selectedDeleteIndexes.clear();
   const photos = getTripPhotos(trip);
+  const allowPhotoDelete = !state.sharedMode && !!state.user;
   const diaries = getTripDiaryRecords(trip);
   const cover = getCoverUrl(trip);
   const name = trip.title || trip.location_name || "未命名旅途";
@@ -1276,12 +1283,13 @@ function renderTripDetail(trip) {
   $("detailMapSummary").textContent = `${location}${dateLabel ? ` · ${dateLabel}` : ""}`;
 
   const recent = photos.slice(0, 6);
-  const recentMarkup = renderDetailPhotoGrid(recent, "目前沒有照片");
+  const recentMarkup = renderDetailPhotoGrid(recent, "目前沒有照片", { selectable: allowPhotoDelete, selectionMode: "delete" });
   $("detailRecentPhotos").innerHTML = recentMarkup;
   renderTripItinerary(trip);
-  $("detailAllPhotos").innerHTML = renderTravelTimeline(trip, photos);
+  $("detailAllPhotos").innerHTML = renderTravelTimeline(trip, photos, { selectable: allowPhotoDelete });
   const hasPhotoTimes = photos.some((photo) => getPhotoTakenAt(photo) || photo.trip_stop_id);
   $("detailPhotosSummary").textContent = `${photos.length} 張照片${cover ? " · 已設定封面" : ""}${hasPhotoTimes ? " · 依照片時間分組" : " · 目前依旅程日期排列"}`;
+  updateDetailDeleteUI();
   renderDetailExpenses(trip);
   $("detailOverviewExpenses").innerHTML = $("detailExpenses").innerHTML;
   setDetailTab("overview");
@@ -1485,16 +1493,19 @@ function getPhotoUrl(photo) {
   return photo?.signed_url || (photo?.storage_path ? getCachedPhotoUrl(photo.storage_path) : "") || "";
 }
 
+function getPhotoSelectionKey(photo, index) {
+  return String(photo?.id || photo?.storage_path || `${photo?.original_name || "photo"}-${index}`);
+}
+
 function renderDetailPhotoGrid(photos, emptyText, options = {}) {
   if (!photos.length) return `<div class="detail-empty">${escapeHtml(emptyText)}</div>`;
   return photos.map((photo, index) => {
     const url = getPhotoUrl(photo);
     const label = photo.original_name || photo.name || `照片 ${index + 1}`;
     const selector = options.selectable
-      ? `<label class="photo-download-check" title="選取照片">
-          <input type="checkbox" data-download-index="${index}" aria-label="選取${escapeHtml(label)}">
-          <span aria-hidden="true"></span>
-        </label>`
+      ? options.selectionMode === "delete"
+        ? `<label class="photo-download-check" title="選取刪除照片"><input type="checkbox" data-delete-photo-key="${escapeHtml(getPhotoSelectionKey(photo, index))}" aria-label="選取刪除${escapeHtml(label)}"><span aria-hidden="true"></span></label>`
+        : `<label class="photo-download-check" title="選取照片"><input type="checkbox" data-download-index="${index}" aria-label="選取${escapeHtml(label)}"><span aria-hidden="true"></span></label>`
       : "";
     return url
     ? `<figure class="detail-photo-tile${options.selectable ? " is-selectable" : ""}" data-photo-index="${index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}">${selector}<img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy" decoding="async"><figcaption>${escapeHtml(label)}</figcaption></figure>`
@@ -1502,7 +1513,7 @@ function renderDetailPhotoGrid(photos, emptyText, options = {}) {
   }).join("");
 }
 
-function renderTravelTimeline(trip, photos) {
+function renderTravelTimeline(trip, photos, options = {}) {
   if (!photos.length) return `<div class="detail-empty">這趟旅程還沒有照片。</div>`;
 
   const items = photos.map((photo, index) => getPhotoTimelineItem(trip, photo, index));
@@ -1549,7 +1560,7 @@ function renderTravelTimeline(trip, photos) {
                 <h4>${escapeHtml(event.location)}</h4>
               </div>
               <div class="detail-photo-grid travel-event-photos">
-                ${event.photos.map((item) => renderTimelinePhotoTile(item)).join("")}
+                ${event.photos.map((item) => renderTimelinePhotoTile(item, options)).join("")}
               </div>
             </div>
           </article>
@@ -1559,13 +1570,16 @@ function renderTravelTimeline(trip, photos) {
   `).join("");
 }
 
-function renderTimelinePhotoTile(item) {
+function renderTimelinePhotoTile(item, options = {}) {
   const photo = item.photo;
   const url = getPhotoUrl(photo);
   const label = photo.original_name || photo.name || `照片 ${item.index + 1}`;
+  const selector = options.selectable
+    ? `<label class="photo-download-check" title="選取刪除照片"><input type="checkbox" data-delete-photo-key="${escapeHtml(getPhotoSelectionKey(photo, item.index))}" aria-label="選取刪除${escapeHtml(label)}"><span aria-hidden="true"></span></label>`
+    : "";
   return url
-    ? `<figure class="detail-photo-tile" data-photo-index="${item.index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}"><img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy" decoding="async"><figcaption>${escapeHtml(label)}</figcaption></figure>`
-    : `<figure class="detail-photo-tile is-missing" data-photo-index="${item.index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}"><div>照片載入中</div><figcaption>${escapeHtml(label)}</figcaption></figure>`;
+    ? `<figure class="detail-photo-tile${options.selectable ? " is-selectable" : ""}" data-photo-index="${item.index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}">${selector}<img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy" decoding="async"><figcaption>${escapeHtml(label)}</figcaption></figure>`
+      : `<figure class="detail-photo-tile${options.selectable ? " is-selectable" : ""} is-missing" data-photo-index="${item.index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}">${selector}<div>照片載入中</div><figcaption>${escapeHtml(label)}</figcaption></figure>`;
 }
 
 function getPhotoTimelineItem(trip, photo, index) {
@@ -1667,6 +1681,42 @@ function handleDetailPhotoKeydown(event) {
   openPhotoViewer(Number(tile.dataset.photoIndex));
 }
 
+function handleDetailPhotoSelection(event) {
+  const checkbox = event.target.closest("[data-delete-photo-key]");
+  if (!checkbox) return;
+  const key = checkbox.dataset.deletePhotoKey;
+  if (checkbox.checked) state.selectedDeleteIndexes.add(key);
+  else state.selectedDeleteIndexes.delete(key);
+  updateDetailDeleteUI();
+}
+
+function updateDetailDeleteUI() {
+  const button = $("deleteSelectedDetailPhotosBtn");
+  if (!button) return;
+  const count = state.selectedDeleteIndexes.size;
+  button.disabled = count === 0;
+  button.textContent = count ? `刪除選取照片（${count}）` : "刪除選取照片（0）";
+}
+
+function syncDetailDeleteCheckboxes() {
+  document.querySelectorAll("[data-delete-photo-key]").forEach((checkbox) => {
+    checkbox.checked = state.selectedDeleteIndexes.has(checkbox.dataset.deletePhotoKey);
+  });
+  updateDetailDeleteUI();
+}
+
+function selectAllDetailPhotos() {
+  const trip = state.editingTrip;
+  if (!trip || state.sharedMode) return;
+  state.selectedDeleteIndexes = new Set(getTripPhotos(trip).map((photo, index) => getPhotoSelectionKey(photo, index)));
+  syncDetailDeleteCheckboxes();
+}
+
+function clearDetailPhotoSelection() {
+  state.selectedDeleteIndexes.clear();
+  syncDetailDeleteCheckboxes();
+}
+
 async function openPhotoViewer(index) {
   const photos = getTripPhotos(state.editingTrip);
   if (!photos[index]) return;
@@ -1728,6 +1778,80 @@ async function downloadViewerPhoto() {
     return toast("分享者沒有開放下載");
   }
   await downloadPhotoFile(photo);
+}
+
+async function deleteSelectedDetailPhotos() {
+  const trip = state.editingTrip;
+  if (state.sharedMode || !trip) return;
+  const photos = getTripPhotos(trip).filter((photo, index) => state.selectedDeleteIndexes.has(getPhotoSelectionKey(photo, index)));
+  if (!photos.length) return toast("請先勾選要刪除的照片");
+  if (!confirm(`確定要刪除選取的 ${photos.length} 張照片嗎？此動作無法復原。`)) return;
+
+  const button = $("deleteSelectedDetailPhotosBtn");
+  if (button) {
+    button.disabled = true;
+    button.textContent = `刪除中 0/${photos.length}`;
+  }
+
+  try {
+    const isLegacy = state.schemaMode === "legacy" || trip._legacy;
+    if (isLegacy) {
+      const selectedPaths = new Set(photos.map((photo) => photo.storage_path).filter(Boolean));
+      const current = parseLegacyPhotos(trip.photos_meta).length
+        ? parseLegacyPhotos(trip.photos_meta)
+        : getTripPhotos(trip).map((photo) => ({
+          path: photo.storage_path,
+          original_name: photo.original_name || photo.name || "照片",
+        }));
+      const next = current.filter((photo) => !selectedPaths.has(photo.path));
+      const { data, error } = await client
+        .from("trips")
+        .update({ photos_meta: JSON.stringify(next) })
+        .eq("id", trip.id)
+        .select("id")
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("照片清單沒有成功更新");
+    } else {
+      const ids = photos.map((photo) => photo.id).filter(Boolean);
+      if (ids.length !== photos.length) throw new Error("部分照片缺少資料編號，請改用單張刪除");
+      const { data, error } = await client
+        .from("trip_photos")
+        .delete()
+        .in("id", ids)
+        .eq("trip_id", trip.id)
+        .select("id");
+      if (error) throw error;
+      if (!Array.isArray(data) || data.length !== ids.length) {
+        throw new Error("刪除資料列數量不一致，請重新整理後確認");
+      }
+    }
+
+    const paths = photos.map((photo) => photo.storage_path).filter(Boolean);
+    let storageClean = true;
+    if (paths.length) {
+      const { error: storageError } = await client.storage.from(state.storageBucket).remove([...new Set(paths)]);
+      if (storageError) {
+        console.error("[deleteSelectedDetailPhotos.storage]", storageError, paths);
+        storageClean = false;
+      }
+    }
+
+    state.selectedDeleteIndexes.clear();
+    await loadTrips();
+    const refreshed = state.trips.find((item) => String(item.id) === String(trip.id));
+    if (refreshed) {
+      await openTrip(refreshed.id);
+    } else {
+      closeTripDetail();
+    }
+    toast(storageClean ? `已刪除 ${photos.length} 張照片` : `已刪除 ${photos.length} 張，但部分雲端檔案清理失敗`);
+  } catch (error) {
+    console.error("[deleteSelectedDetailPhotos]", error);
+    toast(`批次刪除失敗：${error.message || "請稍後再試"}`);
+  } finally {
+    updateDetailDeleteUI();
+  }
 }
 
 async function deleteViewerPhoto() {

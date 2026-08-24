@@ -203,7 +203,14 @@
       </div>
 
       <div class="detail-panel" id="detail-panel-photos" hidden>
-        <div class="detail-panel-heading"><p class="detail-section-eyebrow">TRAVEL TIMELINE</p><h2>旅行時間軸</h2><p id="detailPhotosSummary"></p></div>
+        <div class="detail-panel-heading detail-panel-heading-row">
+          <div><p class="detail-section-eyebrow">TRAVEL TIMELINE</p><h2>旅行時間軸</h2><p id="detailPhotosSummary"></p></div>
+          <div class="detail-photo-management-actions">
+            <button class="btn btn-soft" type="button" id="selectAllDetailPhotosBtn">全選照片</button>
+            <button class="btn btn-ghost" type="button" id="clearDetailPhotoSelectionBtn">取消選取</button>
+            <button class="btn btn-danger" type="button" id="deleteSelectedDetailPhotosBtn" disabled>刪除選取照片（0）</button>
+          </div>
+        </div>
         <div class="travel-timeline" id="detailAllPhotos"></div>
       </div>
 
