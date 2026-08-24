@@ -1780,6 +1780,18 @@ async function downloadViewerPhoto() {
   await downloadPhotoFile(photo);
 }
 
+async function deleteModernTripPhotoRow(photo, trip) {
+  let query = client.from("trip_photos").delete().eq("trip_id", trip.id);
+  if (photo.id) query = query.eq("id", photo.id);
+  else if (photo.storage_path) query = query.eq("storage_path", photo.storage_path);
+  else throw new Error("照片缺少可刪除的資料編號");
+
+  const { data, error } = await query.select("id, storage_path");
+  if (error) throw error;
+  if (!Array.isArray(data) || data.length !== 1) throw new Error("找不到這張照片，可能已被刪除");
+  return data[0];
+}
+
 async function deleteSelectedDetailPhotos() {
   const trip = state.editingTrip;
   if (state.sharedMode || !trip) return;
@@ -1793,6 +1805,7 @@ async function deleteSelectedDetailPhotos() {
     button.textContent = `刪除中 0/${photos.length}`;
   }
 
+  const deletedPhotos = [];
   try {
     const isLegacy = state.schemaMode === "legacy" || trip._legacy;
     if (isLegacy) {
@@ -1812,22 +1825,16 @@ async function deleteSelectedDetailPhotos() {
         .maybeSingle();
       if (error) throw error;
       if (!data) throw new Error("照片清單沒有成功更新");
+      deletedPhotos.push(...photos);
     } else {
-      const ids = photos.map((photo) => photo.id).filter(Boolean);
-      if (ids.length !== photos.length) throw new Error("部分照片缺少資料編號，請改用單張刪除");
-      const { data, error } = await client
-        .from("trip_photos")
-        .delete()
-        .in("id", ids)
-        .eq("trip_id", trip.id)
-        .select("id");
-      if (error) throw error;
-      if (!Array.isArray(data) || data.length !== ids.length) {
-        throw new Error("刪除資料列數量不一致，請重新整理後確認");
+      for (let index = 0; index < photos.length; index += 1) {
+        await deleteModernTripPhotoRow(photos[index], trip);
+        deletedPhotos.push(photos[index]);
+        if (button) button.textContent = `刪除中 ${deletedPhotos.length}/${photos.length}`;
       }
     }
 
-    const paths = photos.map((photo) => photo.storage_path).filter(Boolean);
+    const paths = deletedPhotos.map((photo) => photo.storage_path).filter(Boolean);
     let storageClean = true;
     if (paths.length) {
       const { error: storageError } = await client.storage.from(state.storageBucket).remove([...new Set(paths)]);
@@ -1845,10 +1852,17 @@ async function deleteSelectedDetailPhotos() {
     } else {
       closeTripDetail();
     }
-    toast(storageClean ? `已刪除 ${photos.length} 張照片` : `已刪除 ${photos.length} 張，但部分雲端檔案清理失敗`);
+    toast(storageClean ? `已刪除 ${deletedPhotos.length} 張照片` : `已刪除 ${deletedPhotos.length} 張，但部分雲端檔案清理失敗`);
   } catch (error) {
     console.error("[deleteSelectedDetailPhotos]", error);
-    toast(`批次刪除失敗：${error.message || "請稍後再試"}`);
+    if (deletedPhotos.length) {
+      await loadTrips();
+      const refreshed = state.trips.find((item) => String(item.id) === String(trip.id));
+      if (refreshed) await openTrip(refreshed.id);
+      toast(`已刪除 ${deletedPhotos.length} 張；其餘照片刪除失敗：${error.message || "請稍後再試"}`);
+    } else {
+      toast(`批次刪除失敗：${error.message || "請稍後再試"}`);
+    }
   } finally {
     updateDetailDeleteUI();
   }
@@ -1878,13 +1892,7 @@ async function deleteViewerPhoto() {
       if (error) throw error;
       if (!data) throw new Error("照片清單沒有成功更新");
     } else {
-      const { data, error } = await client
-        .from("trip_photos")
-        .delete()
-        .eq("id", photo.id)
-        .select("id");
-      if (error) throw error;
-      if (!Array.isArray(data) || data.length !== 1) throw new Error("照片資料沒有成功刪除");
+      await deleteModernTripPhotoRow(photo, trip);
     }
 
     if (photo.storage_path) {
