@@ -5,6 +5,7 @@ const bucket = cfg.PHOTO_BUCKET || "trip-photos";
 const authRedirectUrl = cfg.AUTH_REDIRECT_URL || new URL("./", window.location.href).toString();
 const MAX_UPLOAD_FILES = 100;
 const UPLOAD_BATCH_SIZE = 3;
+const SIGNED_URL_BATCH_SIZE = 50;
 
 const state = {
   user: null,
@@ -244,9 +245,20 @@ async function loadTrips() {
   if (error) return toast(error.message);
   state.trips = data || [];
   await loadTripStops();
+  // Render the shell first. Signed URLs are fetched in the background so a
+  // large album does not block the map and trip list from appearing.
+  renderTrips();
+  refreshMarkers();
   await hydratePhotoUrls();
   renderTrips();
   refreshMarkers();
+  if (state.editingTrip && !$("detailDrawer").hidden) {
+    const refreshedTrip = state.trips.find((trip) => trip.id === state.editingTrip.id);
+    if (refreshedTrip) {
+      state.editingTrip = refreshedTrip;
+      renderDrawer(refreshedTrip, state.sharedMode);
+    }
+  }
 }
 
 async function loadTripStops() {
@@ -314,15 +326,17 @@ async function hydratePhotoUrls() {
   ))];
   if (!paths.length) return;
 
-  const { data, error } = await client.storage.from(bucket).createSignedUrls(paths, 60 * 60);
-  if (error) {
-    console.error("[hydratePhotoUrls]", error);
-    return;
+  for (let index = 0; index < paths.length; index += SIGNED_URL_BATCH_SIZE) {
+    const batch = paths.slice(index, index + SIGNED_URL_BATCH_SIZE);
+    const { data, error } = await client.storage.from(bucket).createSignedUrls(batch, 60 * 60);
+    if (error) {
+      console.error("[hydratePhotoUrls]", error, { batchStart: index, batchSize: batch.length });
+      continue;
+    }
+    (data || []).forEach((item) => {
+      if (item?.path && item.signedUrl) state.photoUrls.set(item.path, item.signedUrl);
+    });
   }
-  paths.forEach((path, index) => {
-    const signedUrl = data?.[index]?.signedUrl;
-    if (signedUrl) state.photoUrls.set(path, signedUrl);
-  });
 }
 
 function renderTrips() {
@@ -347,7 +361,7 @@ function renderTrips() {
     const cover = getCoverUrl(trip);
     return `
       <article class="trip-card" data-trip-id="${trip.id}">
-        ${cover ? `<img src="${escapeHtml(cover)}" alt="${escapeHtml(trip.location_name)}">` : `<div class="trip-placeholder">📍</div>`}
+        ${cover ? `<img src="${escapeHtml(cover)}" alt="${escapeHtml(trip.location_name)}" loading="lazy" decoding="async">` : `<div class="trip-placeholder">📍</div>`}
         <div class="trip-card-body">
           <div class="trip-card-title">
             <span>${escapeHtml(trip.title || trip.location_name)}</span>
@@ -453,7 +467,7 @@ function renderDrawer(trip, sharedMode) {
     ? `<div class="photo-gallery">${photos.map((photo, index) => `
         <figure class="photo-tile">
           <button class="photo-open-btn" type="button" data-photo-index="${index}" aria-label="放大第 ${index + 1} 張照片">
-            <img src="${escapeHtml(getPhotoUrl(photo))}" alt="${escapeHtml(photo.caption || trip.location_name)}">
+            <img src="${escapeHtml(getPhotoUrl(photo))}" alt="${escapeHtml(photo.caption || trip.location_name)}" loading="${index < 4 ? "eager" : "lazy"}" decoding="async">
             <span class="photo-zoom-badge" aria-hidden="true">放大</span>
           </button>
           ${canDownload ? `
