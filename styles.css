@@ -819,6 +819,7 @@ input:focus, textarea:focus, select:focus {
   margin: 0;
   border: 0;
   padding: 0;
+  overflow: hidden;
   background: rgba(15,15,14,0.98);
   color: white;
 }
@@ -867,11 +868,17 @@ input:focus, textarea:focus, select:focus {
   display: grid;
   place-items: center;
   overflow: hidden;
+  box-sizing: border-box;
+  padding: 8px 72px;
 }
 
 .lightbox-stage img {
-  width: 100%;
-  height: 100%;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
   display: block;
   object-fit: contain;
 }
@@ -896,12 +903,18 @@ input:focus, textarea:focus, select:focus {
 .lightbox-next { right: 14px; }
 
 .lightbox-caption {
-  min-height: 52px;
+  min-height: 44px;
   margin: 0;
-  padding: 14px 20px;
+  padding: 12px 20px;
+  border-top: 1px solid rgba(255,255,255,0.14);
+  background: rgba(15,15,14,0.98);
   color: rgba(255,255,255,0.82);
   text-align: center;
   font-size: 13px;
+  line-height: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 860px) {
@@ -938,6 +951,10 @@ input:focus, textarea:focus, select:focus {
   .lightbox-nav {
     width: 40px;
     height: 48px;
+  }
+
+  .lightbox-stage {
+    padding: 8px 52px;
   }
 
   .lightbox-prev { left: 8px; }

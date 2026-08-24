@@ -1214,7 +1214,7 @@ function renderPhotoLightbox() {
   $("lightboxCounter").textContent = `${state.lightboxIndex + 1} / ${total}`;
   $("lightboxImage").src = getPhotoUrl(photo);
   $("lightboxImage").alt = photo.caption || state.lightboxTrip.location_name || "旅行照片";
-  $("lightboxCaption").textContent = photo.caption || photo.original_name || state.lightboxTrip.location_name || "";
+  $("lightboxCaption").textContent = photo.original_name || photo.path?.split("/").pop() || photo.caption || state.lightboxTrip.location_name || "";
   $("previousPhotoBtn").hidden = total < 2;
   $("nextPhotoBtn").hidden = total < 2;
   $("lightboxDownloadBtn").hidden = state.lightboxSharedMode && !state.lightboxTrip.can_download;
