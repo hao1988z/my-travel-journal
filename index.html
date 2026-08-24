@@ -4,12 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>旅途日記 · Private Cloud</title>
-  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=20260824-photo-batch">
+  <link rel="stylesheet" href="./styles.css?v=20260824-gallery">
 </head>
 <body>
   <header class="topbar">
@@ -20,6 +19,7 @@
     <div class="topbar-actions">
       <span class="privacy-pill" id="sessionStatus">私人雲端</span>
       <button class="btn btn-ghost" id="signOutBtn" hidden>登出</button>
+      <button class="btn btn-primary" id="newTripBtn" hidden>新增旅途</button>
     </div>
   </header>
 
@@ -49,65 +49,14 @@
   <main class="app-shell" id="appShell" hidden>
     <aside class="sidebar">
       <div class="sidebar-head">
-        <div class="home-heading">
-          <div>
-            <p class="eyebrow">PRIVATE TRAVEL JOURNAL</p>
-            <h1>我的旅行</h1>
-            <p class="home-subtitle">把走過的地方，慢慢整理成自己的故事。</p>
-          </div>
-          <div class="home-heading-actions">
-            <button class="btn btn-soft home-diary" id="homeDiaryBtn" type="button">日記</button>
-            <button class="btn btn-primary home-new-trip" id="homeNewTripBtn" type="button">＋ 新增旅程</button>
-          </div>
-        </div>
+        <h2>我的旅途</h2>
+        <input type="search" id="searchInput" placeholder="搜尋地點、日期、心情...">
       </div>
-
-      <section class="recent-trip-section" aria-labelledby="recentTripHeading">
-        <div class="section-heading">
-          <div>
-            <p class="section-kicker">最近一次旅行</p>
-            <h2 id="recentTripHeading">繼續回顧</h2>
-          </div>
-        </div>
-        <div id="recentTrip" class="recent-trip"></div>
-      </section>
-
-      <section class="memory-section" id="memorySection" aria-labelledby="memoryHeading" hidden>
-        <div class="section-heading">
-          <div>
-            <p class="section-kicker">ON THIS DAY</p>
-            <h2 id="memoryHeading">回憶這一天</h2>
-          </div>
-        </div>
-        <article class="memory-card" id="memoryCard">
-          <div class="memory-media">
-            <img id="memoryImage" alt="旅行回憶" hidden>
-            <div class="memory-placeholder" id="memoryPlaceholder">✦</div>
-          </div>
-          <div class="memory-body">
-            <p class="memory-date" id="memoryDate"></p>
-            <h3 id="memoryTitle">那一天的旅行</h3>
-            <p class="memory-meta" id="memoryMeta"></p>
-            <p class="memory-text" id="memoryText"></p>
-            <button class="text-action" id="memoryOpenBtn" type="button">回顧這趟旅程 →</button>
-          </div>
-        </article>
-      </section>
-
-      <section class="trip-archive" aria-labelledby="tripArchiveHeading">
-        <div class="archive-heading">
-          <div>
-            <p class="section-kicker">TRAVEL ARCHIVE</p>
-            <h2 id="tripArchiveHeading">所有旅程</h2>
-          </div>
-          <input type="search" id="searchInput" placeholder="搜尋旅程、地點、日期..." aria-label="搜尋旅程">
-        </div>
-        <div class="stats-row">
-          <span><strong id="placeCount">0</strong> 趟旅程</span>
-          <span><strong id="photoCount">0</strong> 張照片</span>
-        </div>
-        <div class="trip-list" id="tripList"></div>
-      </section>
+      <div class="stats-row">
+        <span><strong id="placeCount">0</strong> 個地點</span>
+        <span><strong id="photoCount">0</strong> 張照片</span>
+      </div>
+      <div class="trip-list" id="tripList"></div>
     </aside>
 
     <section class="map-panel">
@@ -122,166 +71,6 @@
     </section>
   </main>
 
-  <section class="trip-detail-page" id="tripDetailPage" hidden>
-    <div class="detail-page-shell">
-      <div class="detail-toolbar">
-        <button class="btn btn-soft" id="backToTripsBtn" type="button">← 我的旅途</button>
-        <div class="detail-toolbar-actions">
-          <span class="detail-privacy" id="detailPrivacy">私人</span>
-          <button class="btn btn-soft" id="detailDownloadBtn" type="button">下載封面</button>
-          <button class="btn btn-soft" id="detailSetCoverBtn" type="button">編輯封面</button>
-          <button class="btn btn-primary" id="detailEditBtn" type="button">編輯旅途</button>
-        </div>
-      </div>
-
-      <header class="detail-hero" id="detailHero">
-        <div class="detail-hero-media" id="detailHeroMedia"></div>
-        <div class="detail-hero-content">
-          <p class="detail-kicker" id="detailKicker">TRAVEL JOURNAL</p>
-          <h1 id="detailName">旅途詳情</h1>
-          <p class="detail-hero-meta" id="detailHeroMeta"></p>
-        </div>
-      </header>
-
-      <nav class="detail-tabs" aria-label="旅途內容">
-        <button class="detail-tab active" type="button" data-detail-tab="overview">總覽</button>
-        <button class="detail-tab" type="button" data-detail-tab="itinerary">行程</button>
-        <button class="detail-tab" type="button" data-detail-tab="photos">照片</button>
-        <button class="detail-tab" type="button" data-detail-tab="diary">日記</button>
-        <button class="detail-tab" type="button" data-detail-tab="map">地圖</button>
-        <button class="detail-tab" type="button" data-detail-tab="expenses">花費</button>
-      </nav>
-
-      <div class="detail-panel" id="detail-panel-overview">
-        <div class="detail-stat-grid">
-          <div class="detail-stat"><span>旅行天數</span><strong id="detailDays">—</strong></div>
-          <div class="detail-stat"><span>照片</span><strong id="detailPhotoCount">0</strong></div>
-          <div class="detail-stat"><span>日記</span><strong id="detailDiaryCount">0</strong></div>
-          <div class="detail-stat"><span>地點</span><strong id="detailPlaceCount">1</strong></div>
-        </div>
-
-        <div class="detail-content-grid">
-          <article class="detail-section">
-            <div class="detail-section-head">
-              <div><p class="detail-section-eyebrow">ROUTE</p><h2>旅行路線</h2></div>
-              <button class="text-action" type="button" onclick="setDetailTab('map')">在地圖查看 →</button>
-            </div>
-            <div class="detail-route" id="detailRoute"></div>
-            <p class="detail-muted" id="detailCoordinates"></p>
-          </article>
-          <article class="detail-section">
-            <div class="detail-section-head">
-              <div><p class="detail-section-eyebrow">DIARY</p><h2>這趟旅程</h2></div>
-              <button class="text-action" type="button" onclick="setDetailTab('diary')">閱讀日記 →</button>
-            </div>
-            <div class="detail-diary-preview" id="detailDiaryPreview"></div>
-          </article>
-        </div>
-
-        <article class="detail-section detail-section-wide">
-          <div class="detail-section-head">
-            <div><p class="detail-section-eyebrow">RECENT PHOTOS</p><h2>最近照片</h2></div>
-            <button class="text-action" type="button" onclick="setDetailTab('photos')">查看全部 →</button>
-          </div>
-          <div class="detail-photo-grid" id="detailRecentPhotos"></div>
-        </article>
-
-        <article class="detail-section detail-section-wide">
-          <div class="detail-section-head">
-            <div><p class="detail-section-eyebrow">TRAVEL BUDGET</p><h2>旅程花費</h2></div>
-            <button class="text-action" type="button" onclick="setDetailTab('expenses')">查看明細 →</button>
-          </div>
-          <div class="detail-expense-summary" id="detailOverviewExpenses"></div>
-        </article>
-      </div>
-
-      <div class="detail-panel" id="detail-panel-itinerary" hidden>
-        <div class="detail-panel-heading detail-panel-heading-row">
-          <div><p class="detail-section-eyebrow">DAY BY DAY</p><h2>每日行程與地標</h2><p id="detailItinerarySummary"></p></div>
-          <button class="btn btn-primary" id="detailAddStopBtn" type="button">＋ 新增地標</button>
-        </div>
-        <div class="itinerary-list" id="detailItineraryList"></div>
-      </div>
-
-      <div class="detail-panel" id="detail-panel-photos" hidden>
-        <div class="detail-panel-heading detail-panel-heading-row">
-          <div><p class="detail-section-eyebrow">TRAVEL TIMELINE</p><h2>旅行時間軸</h2><p id="detailPhotosSummary"></p></div>
-          <div class="detail-photo-management-actions">
-            <button class="btn btn-soft" type="button" id="selectAllDetailPhotosBtn">全選照片</button>
-            <button class="btn btn-ghost" type="button" id="clearDetailPhotoSelectionBtn">取消選取</button>
-            <button class="btn btn-danger" type="button" id="deleteSelectedDetailPhotosBtn" disabled>刪除選取照片（0）</button>
-          </div>
-        </div>
-        <div class="travel-timeline" id="detailAllPhotos"></div>
-      </div>
-
-      <div class="detail-panel" id="detail-panel-diary" hidden>
-        <div class="detail-panel-heading"><p class="detail-section-eyebrow">TRAVEL NOTE</p><h2>旅行日記</h2><p id="detailDiaryDate"></p></div>
-        <div class="detail-diary-body" id="detailDiaryBody"></div>
-      </div>
-
-      <div class="detail-panel" id="detail-panel-map" hidden>
-        <div class="detail-panel-heading"><p class="detail-section-eyebrow">WHERE I WENT</p><h2>旅程地圖</h2><p id="detailMapSummary"></p></div>
-        <div class="detail-map" id="detailMap"></div>
-      </div>
-
-      <div class="detail-panel" id="detail-panel-expenses" hidden>
-        <div class="detail-panel-heading detail-panel-heading-row"><div><p class="detail-section-eyebrow">TRAVEL BUDGET</p><h2>旅程花費</h2><p>沿用目前旅程資料；尚未記錄的項目不會自動補寫。</p></div><button class="btn btn-soft" type="button" id="detailEditExpensesBtn">編輯花費</button></div>
-        <div class="detail-expense-summary" id="detailExpenses"></div>
-      </div>
-    </div>
-  </section>
-
-  <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="主要導覽" hidden>
-    <button class="mobile-nav-item is-active" type="button" data-mobile-nav="home" aria-label="旅程">
-      <span class="mobile-nav-icon" aria-hidden="true">⌂</span>
-      <span>旅程</span>
-    </button>
-    <button class="mobile-nav-item" type="button" data-mobile-nav="map" aria-label="地圖">
-      <span class="mobile-nav-icon" aria-hidden="true">⌖</span>
-      <span>地圖</span>
-    </button>
-    <button class="mobile-nav-add" type="button" id="mobileAddBtn" aria-label="新增">
-      <span aria-hidden="true">＋</span>
-    </button>
-    <button class="mobile-nav-item" type="button" data-mobile-nav="diary" aria-label="日記">
-      <span class="mobile-nav-icon" aria-hidden="true">▤</span>
-      <span>日記</span>
-    </button>
-    <button class="mobile-nav-item" type="button" data-mobile-nav="more" aria-label="更多">
-      <span class="mobile-nav-icon" aria-hidden="true">•••</span>
-      <span>更多</span>
-    </button>
-  </nav>
-
-  <dialog class="photo-viewer" id="photoViewer" aria-labelledby="photoViewerTitle">
-    <div class="photo-viewer-head">
-      <div>
-        <p class="detail-section-eyebrow">PHOTO</p>
-        <h2 id="photoViewerTitle">照片</h2>
-        <p class="photo-viewer-meta" id="photoViewerMeta"></p>
-      </div>
-      <button class="icon-btn" id="photoViewerCloseBtn" type="button" aria-label="關閉照片檢視">×</button>
-    </div>
-    <div class="photo-viewer-stage">
-      <button class="photo-viewer-nav photo-viewer-prev" id="photoViewerPrevBtn" type="button" aria-label="上一張">‹</button>
-      <img id="photoViewerImage" alt="旅程照片">
-      <div class="photo-viewer-missing" id="photoViewerMissing" hidden>照片目前無法載入</div>
-      <button class="photo-viewer-nav photo-viewer-next" id="photoViewerNextBtn" type="button" aria-label="下一張">›</button>
-    </div>
-    <div class="photo-viewer-foot">
-      <div>
-        <p class="photo-viewer-caption" id="photoViewerCaption"></p>
-        <p class="photo-viewer-counter" id="photoViewerCounter"></p>
-      </div>
-      <div class="photo-viewer-actions">
-        <button class="btn btn-soft" id="photoViewerCoverBtn" type="button">設為封面</button>
-        <button class="btn btn-danger" id="photoViewerDeleteBtn" type="button">刪除照片</button>
-        <button class="btn btn-soft" id="photoViewerDownloadBtn" type="button">下載照片</button>
-      </div>
-    </div>
-  </dialog>
-
   <dialog class="trip-dialog" id="tripDialog">
     <form method="dialog" class="trip-form" id="tripForm">
       <div class="dialog-head">
@@ -289,13 +78,15 @@
         <button class="icon-btn" type="button" id="closeDialogBtn" aria-label="關閉">×</button>
       </div>
 
-      <label class="photo-picker">
-        <span>照片（可多選，最多 200 張）</span>
-        <input type="file" id="photoInput" accept="image/*" multiple>
-        <small class="photo-picker-note">可一次選取多張照片；上傳前可以移除不需要的照片。</small>
+      <div class="photo-picker">
+        <label>
+          <span>照片（一次可選 1～200 張）</span>
+          <input type="file" id="photoInput" accept="image/*" multiple>
+          <span class="photo-help">單張上限 10MB，可分次加入並在上傳前移除不需要的照片。</span>
+        </label>
+        <span class="photo-selection-summary" id="photoSelectionSummary" hidden></span>
         <div class="photo-preview-grid" id="photoPreviewGrid" hidden></div>
-        <img id="photoPreview" alt="" hidden>
-      </label>
+      </div>
 
       <div class="form-grid">
         <label>
@@ -310,13 +101,7 @@
 
       <label>
         地點名稱
-        <div class="location-input-row">
-          <input type="text" id="locationInput" placeholder="京都清水寺" required autocomplete="off">
-          <button class="btn btn-soft" id="searchLocationBtn" type="button">搜尋地標</button>
-        </div>
-        <p class="location-search-status" id="locationSearchStatus" aria-live="polite"></p>
-        <div class="location-results" id="locationResults" role="listbox" hidden></div>
-        <p class="location-search-source">地圖資料：OpenStreetMap</p>
+        <input type="text" id="locationInput" placeholder="京都清水寺" required>
       </label>
 
       <div class="form-grid">
@@ -354,27 +139,6 @@
         <input type="text" id="tagsInput" placeholder="美食, 古蹟, 海邊">
       </label>
 
-      <fieldset class="permissions expense-editor">
-        <legend>旅程花費</legend>
-        <label>
-          幣別
-          <select id="expenseCurrencyInput">
-            <option value="TWD">TWD · 新台幣</option>
-            <option value="JPY">JPY · 日圓</option>
-            <option value="CNY">CNY · 人民幣</option>
-            <option value="USD">USD · 美元</option>
-            <option value="KRW">KRW · 韓元</option>
-          </select>
-        </label>
-        <div class="form-grid">
-          <label>交通<input type="number" id="expenseTransportInput" min="0" step="0.01" placeholder="0"></label>
-          <label>住宿<input type="number" id="expenseHotelInput" min="0" step="0.01" placeholder="0"></label>
-          <label>餐飲<input type="number" id="expenseFoodInput" min="0" step="0.01" placeholder="0"></label>
-          <label>其他<input type="number" id="expenseOtherInput" min="0" step="0.01" placeholder="0"></label>
-        </div>
-        <p class="expense-editor-note">清空全部金額即可移除這趟旅程的花費紀錄。</p>
-      </fieldset>
-
       <fieldset class="permissions">
         <legend>分享權限</legend>
         <label><input type="checkbox" id="sharedInput"> 開啟分享連結</label>
@@ -382,143 +146,42 @@
         <label><input type="checkbox" id="guestUploadInput"> 允許分享對象補照片</label>
       </fieldset>
 
-      <p class="trip-form-status" id="tripFormStatus" aria-live="polite"></p>
       <div class="dialog-actions">
         <button class="btn btn-soft" type="button" id="deleteTripBtn" hidden>刪除</button>
-        <button class="btn btn-primary" id="saveTripBtn" type="submit">儲存</button>
+        <button class="btn btn-primary" type="submit" id="saveTripBtn">儲存</button>
       </div>
     </form>
   </dialog>
 
-  <dialog class="trip-dialog stop-dialog" id="stopDialog">
-    <form class="trip-form" id="stopForm">
-      <div class="dialog-head">
-        <div><p class="detail-section-eyebrow">ADD STOP</p><h3>新增地標</h3></div>
-        <button class="icon-btn" type="button" id="closeStopDialogBtn" aria-label="關閉">×</button>
-      </div>
-
-      <label>
-        所屬 Day
-        <select id="stopDayInput" required></select>
-      </label>
-
-      <label>
-        地標名稱
-        <div class="location-input-row">
-          <input type="text" id="stopNameInput" placeholder="平江路歷史街區" required autocomplete="off">
-          <button class="btn btn-soft" id="searchStopLocationBtn" type="button">搜尋地點</button>
-          <button class="btn btn-soft" id="pickStopOnMapBtn" type="button">地圖選擇</button>
+  <dialog class="photo-lightbox" id="photoLightbox" aria-label="照片檢視器">
+    <div class="lightbox-shell">
+      <div class="lightbox-head">
+        <span id="lightboxCounter">1 / 1</span>
+        <div class="lightbox-actions">
+          <button class="btn btn-soft" type="button" id="lightboxCoverBtn">設為封面</button>
+          <button class="btn btn-soft" type="button" id="lightboxDownloadBtn">儲存照片</button>
+          <button class="icon-btn lightbox-close" type="button" id="closeLightboxBtn" aria-label="關閉照片">×</button>
         </div>
-        <p class="location-search-status" id="stopLocationStatus" aria-live="polite"></p>
-        <div class="location-results" id="stopLocationResults" role="listbox" hidden></div>
-      </label>
-
-      <label>
-        地址
-        <input type="text" id="stopAddressInput" placeholder="蘇州市姑蘇區">
-      </label>
-
-      <div class="form-grid">
-        <label>緯度<input type="number" id="stopLatInput" step="0.000001" placeholder="31.314000"></label>
-        <label>經度<input type="number" id="stopLngInput" step="0.000001" placeholder="120.630000"></label>
       </div>
-
-      <div class="form-grid">
-        <label>抵達時間<input type="time" id="stopArrivalInput"></label>
-        <label>離開時間（選填）<input type="time" id="stopDepartureInput"></label>
+      <div class="lightbox-stage">
+        <button class="lightbox-nav lightbox-prev" type="button" id="previousPhotoBtn" aria-label="上一張">‹</button>
+        <img id="lightboxImage" alt="">
+        <button class="lightbox-nav lightbox-next" type="button" id="nextPhotoBtn" aria-label="下一張">›</button>
       </div>
+      <p class="lightbox-caption" id="lightboxCaption"></p>
+    </div>
+  </dialog>
 
-      <div class="form-grid">
-        <label>類型
-          <select id="stopCategoryInput">
-            <option value="">未分類</option><option>景點</option><option>餐廳</option><option>咖啡</option><option>住宿</option><option>交通</option>
-          </select>
-        </label>
-        <label>心情
-          <select id="stopMoodInput"><option value="">未記錄</option><option>😄 開心</option><option>😊 放鬆</option><option>😌 平靜</option><option>🥰 喜歡</option><option>🤩 難忘</option></select>
-        </label>
+  <dialog class="cover-picker" id="coverPicker" aria-labelledby="coverPickerTitle">
+    <div class="cover-picker-head">
+      <div>
+        <p class="eyebrow">Cover Photo</p>
+        <h2 id="coverPickerTitle">選擇旅程封面</h2>
+        <p class="cover-picker-status" id="coverPickerStatus">點選照片即可設為封面</p>
       </div>
-
-      <label>照片（可選）<input type="file" id="stopPhotoInput" accept="image/*" multiple></label>
-      <label>簡短筆記<textarea id="stopNoteInput" placeholder="在這裡停留時的感受……"></textarea></label>
-
-      <p class="stop-form-status" id="stopFormStatus" aria-live="polite"></p>
-      <div class="dialog-actions">
-        <button class="btn btn-soft" type="button" id="cancelStopDialogBtn">完成</button>
-        <button class="btn btn-primary" type="submit">加入地標</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog class="action-sheet" id="quickActionSheet" aria-labelledby="quickActionTitle">
-    <div class="sheet-head">
-      <div><p class="detail-section-eyebrow">QUICK ACTION</p><h2 id="quickActionTitle">要新增什麼？</h2></div>
-      <button class="icon-btn" id="closeQuickActionBtn" type="button" aria-label="關閉">×</button>
+      <button class="icon-btn" id="coverPickerCloseBtn" type="button" aria-label="關閉封面選擇">×</button>
     </div>
-    <div class="sheet-actions">
-      <button type="button" data-quick-action="trip"><span aria-hidden="true">🧳</span><span><strong>新增旅程</strong><small>建立一段新的旅行紀錄</small></span></button>
-      <button type="button" data-quick-action="photo"><span aria-hidden="true">📷</span><span><strong>新增照片</strong><small>加入最近旅程的照片</small></span></button>
-      <button type="button" data-quick-action="diary"><span aria-hidden="true">📝</span><span><strong>寫旅行日記</strong><small>回到最近旅程記下心情</small></span></button>
-    </div>
-  </dialog>
-
-  <dialog class="action-sheet" id="moreMenuSheet" aria-labelledby="moreMenuTitle">
-    <div class="sheet-head">
-      <div><p class="detail-section-eyebrow">EXPLORE</p><h2 id="moreMenuTitle">更多</h2></div>
-      <button class="icon-btn" id="closeMoreMenuBtn" type="button" aria-label="關閉">×</button>
-    </div>
-    <div class="more-menu-list">
-      <button type="button" data-more-action="photos"><span>相簿</span><small>查看最近旅程的照片</small></button>
-      <button type="button" data-more-action="diary"><span>日記</span><small>閱讀以前寫下的旅行文章</small></button>
-      <button type="button" data-more-action="footprints"><span>我的足跡</span><small>在地圖查看所有旅程</small></button>
-      <button type="button" disabled><span>月曆</span><small>下一階段接入</small></button>
-      <button type="button" data-more-action="timeline"><span>時間軸</span><small>查看最近旅程的照片時間軸</small></button>
-      <button type="button" data-more-action="stats"><span>統計</span><small>看看自己的旅行習慣</small></button>
-      <button type="button" disabled><span>資料管理</span><small>備份功能接入後會放在這裡</small></button>
-      <button type="button" data-more-action="settings"><span>設定</span><small>私人雲端與帳號設定</small></button>
-    </div>
-  </dialog>
-
-  <dialog class="action-sheet footprint-sheet" id="footprintSheet" aria-labelledby="footprintTitle">
-    <div class="sheet-head">
-      <div><p class="detail-section-eyebrow">MY FOOTPRINTS</p><h2 id="footprintTitle">我的足跡</h2></div>
-      <button class="icon-btn" id="closeFootprintBtn" type="button" aria-label="關閉我的足跡">×</button>
-    </div>
-    <div class="footprint-body">
-      <p class="footprint-lead">我人生去過哪裡？</p>
-      <div class="footprint-stats" id="footprintStats"></div>
-      <button class="footprint-map-link" id="footprintMapBtn" type="button">在世界地圖查看所有足跡 →</button>
-      <div class="footprint-years" id="footprintYears"></div>
-    </div>
-  </dialog>
-
-  <dialog class="action-sheet stats-sheet" id="statsSheet" aria-labelledby="statsTitle">
-    <div class="sheet-head">
-      <div><p class="detail-section-eyebrow">MY TRAVEL</p><h2 id="statsTitle">旅行統計</h2></div>
-      <button class="icon-btn" id="closeStatsBtn" type="button" aria-label="關閉旅行統計">×</button>
-    </div>
-    <div class="travel-stats-body" id="travelStatsBody"></div>
-  </dialog>
-
-  <dialog class="action-sheet diary-library-sheet" id="diaryLibrarySheet" aria-labelledby="diaryLibraryTitle">
-    <div class="sheet-head">
-      <div><p class="detail-section-eyebrow">TRAVEL NOTES</p><h2 id="diaryLibraryTitle">旅行日記</h2></div>
-      <button class="icon-btn" id="closeDiaryLibraryBtn" type="button" aria-label="關閉旅行日記">×</button>
-    </div>
-    <div class="diary-library" id="diaryLibrary"></div>
-  </dialog>
-
-  <dialog class="action-sheet settings-sheet" id="settingsSheet" aria-labelledby="settingsTitle">
-    <div class="sheet-head">
-      <div><p class="detail-section-eyebrow">SETTINGS</p><h2 id="settingsTitle">設定</h2></div>
-      <button class="icon-btn" id="closeSettingsBtn" type="button" aria-label="關閉">×</button>
-    </div>
-    <div class="settings-summary">
-      <strong>私人雲端</strong>
-      <span id="settingsEmail">登入帳號</span>
-      <p>旅程預設為私人，只有開啟分享後才會產生分享連結。</p>
-    </div>
-    <button class="btn btn-ghost settings-signout" id="mobileSignOutBtn" type="button">登出</button>
+    <div class="cover-picker-grid" id="coverPickerGrid"></div>
   </dialog>
 
   <div class="toast" id="toast"></div>
@@ -526,7 +189,7 @@
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="./config.js?v=20260818-old-project"></script>
-  <script src="./app.js?v=20260824-cover-editor-2"></script>
+  <script src="./config.js"></script>
+  <script src="./app.js?v=20260824-cover-picker-1"></script>
 </body>
 </html>
