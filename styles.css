@@ -344,7 +344,8 @@ input:focus, textarea:focus, select:focus {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  background: var(--field);
 }
 
 .photo-open-btn {
@@ -719,7 +720,8 @@ input:focus, textarea:focus, select:focus {
 .photo-preview-item img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: var(--field);
   display: block;
 }
 
