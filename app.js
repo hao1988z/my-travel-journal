@@ -2081,6 +2081,7 @@ function renderDrawer(trip, sharedMode) {
       </section>
     `
     : "";
+  const sharedItinerary = sharedMode ? renderSharedItinerary(trip) : "";
   const shareButton = !sharedMode && trip.is_shared
     ? shareUrl
       ? `<button class="btn btn-soft" id="copyShareBtn">複製分享連結</button>`
@@ -2093,11 +2094,12 @@ function renderDrawer(trip, sharedMode) {
     <div class="chip-row">
       <span class="chip private">${trip.is_shared ? "已開啟分享" : "私人"}</span>
       <span class="chip blue">${escapeHtml(trip.location_name)}</span>
-      ${trip.travel_date ? `<span class="chip blue">${formatDate(trip.travel_date)}</span>` : ""}
+    ${trip.travel_date ? `<span class="chip blue">${formatDate(trip.travel_date)}</span>` : ""}
       ${trip.mood ? `<span class="chip">${escapeHtml(trip.mood)}</span>` : ""}
       ${tags}
     </div>
     ${trip.diary ? `<div class="diary">${escapeHtml(trip.diary)}</div>` : ""}
+    ${sharedItinerary}
     ${sharedPhotoGallery}
     <div class="drawer-actions">
       ${!sharedMode ? `<button class="btn btn-primary" id="editTripBtn">編輯</button>` : ""}
@@ -2122,6 +2124,65 @@ function renderDrawer(trip, sharedMode) {
   $("downloadPhotoBtn")?.addEventListener("click", () => downloadCover(trip, sharedMode));
   $("downloadAllPhotosBtn")?.addEventListener("click", () => downloadAllPhotos(trip, sharedMode));
   $("guestPhotoInput")?.addEventListener("change", (event) => uploadGuestPhoto(event, trip.share_token));
+}
+
+function renderSharedItinerary(trip) {
+  const days = getTripDays(trip);
+  const stopCount = days.reduce((sum, day) => sum + (day.trip_stops || []).length, 0);
+  if (!days.length || !stopCount) return "";
+
+  return `
+    <section class="shared-photo-section shared-itinerary-section">
+      <div class="shared-photo-section-head">
+        <strong>每日行程與地標</strong>
+        <span>${days.length} 天 · ${stopCount} 個地標</span>
+      </div>
+      <div class="itinerary-list shared-itinerary-list">
+        ${days.map((day) => {
+          const stops = [...(day.trip_stops || [])].sort(compareStops);
+          return `
+            <section class="itinerary-day">
+              <header class="itinerary-day-head">
+                <div>
+                  <p class="travel-day-label">DAY ${escapeHtml(day.day_number)}</p>
+                  <h3>${escapeHtml(day.title || formatItineraryDate(day.date) || "未命名的一天")}</h3>
+                </div>
+                <span>${stops.length} 個地標</span>
+              </header>
+              <div class="itinerary-stop-list">
+                ${stops.map((stop, index) => renderSharedItineraryStop(stop, index)).join("")}
+              </div>
+            </section>
+          `;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderSharedItineraryStop(stop, index) {
+  const time = [stop.arrival_time, stop.departure_time].filter(Boolean).join(" — ");
+  const meta = [stop.category, time].filter(Boolean).join(" · ");
+  const coordinates = numberOrNull(stop.lat) !== null && numberOrNull(stop.lng) !== null
+    ? `<a class="text-action itinerary-stop-map" href="https://www.openstreetmap.org/?mlat=${encodeURIComponent(stop.lat)}&mlon=${encodeURIComponent(stop.lng)}#map=17/${encodeURIComponent(stop.lat)}/${encodeURIComponent(stop.lng)}" target="_blank" rel="noopener">地圖 →</a>`
+    : "";
+
+  return `
+    <article class="itinerary-stop shared-itinerary-stop">
+      <span aria-hidden="true"></span>
+      <span class="itinerary-stop-order">${index + 1}</span>
+      <div class="itinerary-stop-body">
+        <div class="itinerary-stop-title">
+          <strong>${escapeHtml(stop.name)}</strong>
+          ${stop.arrival_time ? `<time>${escapeHtml(stop.arrival_time)}</time>` : ""}
+        </div>
+        <p>${escapeHtml(meta || stop.address || "尚未記錄時間")}</p>
+        ${stop.note ? `<small>${escapeHtml(stop.note)}</small>` : ""}
+        ${stop.mood ? `<span class="itinerary-stop-photos">${escapeHtml(stop.mood)}</span>` : ""}
+      </div>
+      <div class="itinerary-stop-actions">${coordinates}</div>
+    </article>
+  `;
 }
 
 function closeDrawer() {
