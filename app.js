@@ -376,6 +376,21 @@ function renderDrawer(trip, sharedMode) {
   const coverEditor = !sharedMode && photos.length
     ? `<div class="cover-editor-panel"><div><strong>旅程封面</strong><span>一次查看全部照片，點選即可更換</span></div><button class="btn btn-soft" type="button" id="editCoverBtn">編輯封面</button></div>`
     : "";
+  const sharePanel = !sharedMode
+    ? `
+      <section class="share-panel">
+        <div class="share-panel-head">
+          <div><strong>分享這趟旅程</strong><span>${trip.is_shared ? "已開啟分享，擁有連結的人才能查看" : "目前為私人旅程"}</span></div>
+          ${trip.is_shared ? `<span class="share-state">已開啟</span>` : ""}
+        </div>
+        ${trip.is_shared && shareUrl
+          ? `<div class="share-link-row"><input id="shareUrlInput" type="text" value="${escapeHtml(shareUrl)}" readonly aria-label="分享連結"><button class="btn btn-soft" type="button" id="copyShareLinkBtn">複製連結</button><button class="btn btn-primary" type="button" id="shareTripBtn">分享</button></div>`
+          : trip.is_shared
+            ? `<p class="share-panel-note">分享已開啟。請用 HTTP(S) 網址重新開啟網站，才能產生可複製的分享連結。</p>`
+            : `<button class="btn btn-primary" type="button" id="enableShareBtn">開啟分享並取得連結</button>`}
+      </section>
+    `
+    : "";
   const downloadPanel = photos.length && canDownload
     ? `
       <div class="photo-download-panel">
@@ -407,6 +422,7 @@ function renderDrawer(trip, sharedMode) {
   $("drawerTitle").textContent = trip.title || trip.location_name;
   $("drawerBody").innerHTML = `
     ${coverEditor}
+    ${sharePanel}
     ${downloadPanel}
     ${photoGallery}
     <div class="location-card">
@@ -422,19 +438,15 @@ function renderDrawer(trip, sharedMode) {
     ${trip.diary ? `<div class="diary">${escapeHtml(trip.diary)}</div>` : ""}
     <div class="drawer-actions">
       ${!sharedMode ? `<button class="btn btn-primary" id="editTripBtn">編輯</button>` : ""}
-      ${!sharedMode && trip.is_shared && shareUrl ? `<button class="btn btn-soft" id="shareTripBtn">分享旅程</button>` : ""}
     </div>
     ${guestUpload}
-    ${!sharedMode && trip.is_shared
-      ? shareUrl
-        ? `<p class="trip-meta">分享連結：${escapeHtml(shareUrl)}</p>`
-        : `<p class="trip-meta">請使用 HTTP(S) 網址開啟網站後再建立分享連結。</p>`
-      : ""}
   `;
 
   $("detailDrawer").hidden = false;
   $("editTripBtn")?.addEventListener("click", () => openTripDialog(trip));
   $("editCoverBtn")?.addEventListener("click", () => openCoverPicker(trip));
+  $("enableShareBtn")?.addEventListener("click", () => enableShareLink(trip));
+  $("copyShareLinkBtn")?.addEventListener("click", () => copyText(shareUrl));
   $("shareTripBtn")?.addEventListener("click", () => shareTrip(trip, shareUrl));
   $("guestPhotoInput")?.addEventListener("change", (event) => uploadGuestPhotos(event, trip.share_token));
   $("drawerBody").querySelectorAll(".photo-open-btn").forEach((button) => {
@@ -1233,6 +1245,48 @@ async function shareTrip(trip, shareUrl) {
     }
   }
   await copyText(`${payload.text}\n${shareUrl}`);
+}
+
+async function enableShareLink(trip) {
+  if (!trip || state.sharedMode || !state.user) return;
+  const button = $("enableShareBtn");
+  if (button) {
+    button.disabled = true;
+    button.textContent = "建立中…";
+  }
+
+  try {
+    const { data, error } = await client
+      .from("trips")
+      .update({ is_shared: true })
+      .eq("id", trip.id)
+      .select("id,is_shared,share_token")
+      .single();
+    if (error) throw error;
+    if (!data?.id || data.is_shared !== true || !data.share_token) {
+      throw new Error("分享連結沒有成功建立");
+    }
+
+    Object.assign(trip, data);
+    const currentTrip = state.trips.find((item) => String(item.id) === String(trip.id));
+    if (currentTrip) Object.assign(currentTrip, data);
+    renderTrips();
+    refreshMarkers();
+    renderDrawer(trip, false);
+    const shareUrl = getShareUrl(trip.share_token);
+    if (shareUrl) {
+      await copyText(shareUrl);
+    } else {
+      toast("分享已開啟，請改用 HTTP(S) 網址查看連結");
+    }
+  } catch (error) {
+    console.error("[enableShareLink]", error);
+    toast(`建立分享連結失敗：${error.message || "請稍後再試"}`);
+    if (button) {
+      button.disabled = false;
+      button.textContent = "開啟分享並取得連結";
+    }
+  }
 }
 
 async function copyText(text) {
