@@ -3631,6 +3631,11 @@ function prepareGuestPhotos(event, shareToken) {
     event.target.value = "";
     return toast(`朋友一次最多上傳 ${MAX_UPLOAD_FILES} 張照片`);
   }
+  const oversizedFile = files.find((file) => file.size > 25 * 1024 * 1024);
+  if (oversizedFile) {
+    event.target.value = "";
+    return toast(`「${oversizedFile.name}」超過 25 MB，請先壓縮照片`);
+  }
   const invalidFile = files.find((file) => !file.type.startsWith("image/"));
   if (invalidFile) {
     event.target.value = "";
@@ -3678,7 +3683,7 @@ async function uploadGuestPhotos(shareToken) {
         const missingFunction = response.status === 404 || payload.code === "NOT_FOUND";
         throw new Error(missingFunction
           ? "補照片服務尚未部署，請通知網站管理者"
-          : (payload.error || "上傳失敗"));
+          : (payload.detail || payload.error || "上傳失敗"));
       }
 
       uploadedCount += Number(payload.count) || batch.length;
