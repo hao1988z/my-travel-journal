@@ -1658,6 +1658,39 @@ function getPhotoUrl(photo) {
   return photo?.signed_url || (photo?.storage_path ? getCachedPhotoUrl(photo.storage_path) : "") || "";
 }
 
+const LAZY_IMAGE_PLACEHOLDER = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
+let lazyPhotoObserver = null;
+
+function observeLazyPhotoImages(root = document) {
+  const images = root?.querySelectorAll?.("img[data-lazy-src]") || [];
+  if (!images.length) return;
+
+  if (!("IntersectionObserver" in window)) {
+    images.forEach((image) => {
+      image.src = image.dataset.lazySrc;
+      image.removeAttribute("data-lazy-src");
+    });
+    return;
+  }
+
+  if (!lazyPhotoObserver) {
+    lazyPhotoObserver = new IntersectionObserver((entries, observer) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        const image = entry.target;
+        const src = image.dataset.lazySrc;
+        if (src) {
+          image.src = src;
+          image.removeAttribute("data-lazy-src");
+        }
+        observer.unobserve(image);
+      });
+    }, { rootMargin: "360px 0px" });
+  }
+
+  images.forEach((image) => lazyPhotoObserver.observe(image));
+}
+
 function getPhotoSelectionKey(photo, index) {
   return String(photo?.id || photo?.storage_path || `${photo?.original_name || "photo"}-${index}`);
 }
@@ -1672,8 +1705,11 @@ function renderDetailPhotoGrid(photos, emptyText, options = {}) {
         ? `<label class="photo-download-check" title="選取刪除照片"><input type="checkbox" data-delete-photo-key="${escapeHtml(getPhotoSelectionKey(photo, index))}" aria-label="選取刪除${escapeHtml(label)}"><span aria-hidden="true"></span></label>`
         : `<label class="photo-download-check" title="選取照片"><input type="checkbox" data-download-index="${index}" aria-label="選取${escapeHtml(label)}"><span aria-hidden="true"></span></label>`
       : "";
+    const image = options.lazy
+      ? `<img src="${LAZY_IMAGE_PLACEHOLDER}" data-lazy-src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy" fetchpriority="low" decoding="async">`
+      : `<img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy" decoding="async">`;
     return url
-    ? `<figure class="detail-photo-tile${options.selectable ? " is-selectable" : ""}" data-photo-index="${index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}">${selector}<img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy" decoding="async"><figcaption>${escapeHtml(label)}</figcaption></figure>`
+    ? `<figure class="detail-photo-tile${options.selectable ? " is-selectable" : ""}" data-photo-index="${index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}">${selector}${image}<figcaption>${escapeHtml(label)}</figcaption></figure>`
       : `<figure class="detail-photo-tile is-missing${options.selectable ? " is-selectable" : ""}" data-photo-index="${index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}">${selector}<div>照片載入中</div><figcaption>${escapeHtml(label)}</figcaption></figure>`;
   }).join("");
 }
@@ -2607,7 +2643,7 @@ function renderDrawer(trip, sharedMode) {
           ${sharedDownloadActions}
         </div>
         <div class="detail-photo-grid shared-photo-grid" id="sharedPhotoGrid">
-          ${renderDetailPhotoGrid(photos, "目前沒有照片", { selectable: true })}
+          ${renderDetailPhotoGrid(photos, "目前沒有照片", { selectable: true, lazy: true })}
         </div>
       </section>
     `
@@ -2646,6 +2682,7 @@ function renderDrawer(trip, sharedMode) {
   `;
 
   $("detailDrawer").hidden = false;
+  observeLazyPhotoImages($("sharedPhotoGrid"));
   $("editTripBtn")?.addEventListener("click", () => openTripDialog(trip));
   $("copyShareBtn")?.addEventListener("click", () => copyText(shareUrl));
   $("repairShareBtn")?.addEventListener("click", () => toggleTripSharing(trip, true));
