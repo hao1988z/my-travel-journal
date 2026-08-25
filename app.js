@@ -8,6 +8,7 @@ const SIGNED_URL_CACHE_TTL_MS = 55 * 60 * 1000;
 const SIGNED_URL_BATCH_SIZE = 100;
 const MAX_UPLOAD_FILES = 200;
 const GUEST_UPLOAD_BATCH_SIZE = 25;
+const SHARED_PHOTO_PAGE_SIZE = 36;
 
 const state = {
   user: null,
@@ -34,6 +35,7 @@ const state = {
   viewerIndex: 0,
   viewerZoom: 1,
   selectedDownloadIndexes: new Set(),
+  sharedPhotoVisibleCount: SHARED_PHOTO_PAGE_SIZE,
   selectedDeleteIndexes: new Set(),
   locationResults: [],
   stopLocationResults: [],
@@ -1697,7 +1699,11 @@ function getPhotoSelectionKey(photo, index) {
 
 function renderDetailPhotoGrid(photos, emptyText, options = {}) {
   if (!photos.length) return `<div class="detail-empty">${escapeHtml(emptyText)}</div>`;
-  return photos.map((photo, index) => {
+  const offset = Math.max(0, Number(options.offset) || 0);
+  const pageSize = Number(options.limit) > 0 ? Number(options.limit) : photos.length;
+  const visiblePhotos = photos.slice(offset, offset + pageSize);
+  const tiles = visiblePhotos.map((photo, localIndex) => {
+    const index = offset + localIndex;
     const url = getPhotoUrl(photo);
     const label = photo.original_name || photo.name || `照片 ${index + 1}`;
     const selector = options.selectable
@@ -1705,13 +1711,19 @@ function renderDetailPhotoGrid(photos, emptyText, options = {}) {
         ? `<label class="photo-download-check" title="選取刪除照片"><input type="checkbox" data-delete-photo-key="${escapeHtml(getPhotoSelectionKey(photo, index))}" aria-label="選取刪除${escapeHtml(label)}"><span aria-hidden="true"></span></label>`
         : `<label class="photo-download-check" title="選取照片"><input type="checkbox" data-download-index="${index}" aria-label="選取${escapeHtml(label)}"><span aria-hidden="true"></span></label>`
       : "";
+    const imageAlt = options.lazy ? "" : label;
     const image = options.lazy
-      ? `<img src="${LAZY_IMAGE_PLACEHOLDER}" data-lazy-src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy" fetchpriority="low" decoding="async">`
-      : `<img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy" decoding="async">`;
+      ? `<img src="${LAZY_IMAGE_PLACEHOLDER}" data-lazy-src="${escapeHtml(url)}" alt="" loading="lazy" fetchpriority="low" decoding="async">`
+      : `<img src="${escapeHtml(url)}" alt="${escapeHtml(imageAlt)}" loading="lazy" decoding="async">`;
     return url
     ? `<figure class="detail-photo-tile${options.selectable ? " is-selectable" : ""}" data-photo-index="${index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}">${selector}${image}<figcaption>${escapeHtml(label)}</figcaption></figure>`
       : `<figure class="detail-photo-tile is-missing${options.selectable ? " is-selectable" : ""}" data-photo-index="${index}" tabindex="0" role="button" aria-label="查看${escapeHtml(label)}">${selector}<div>照片載入中</div><figcaption>${escapeHtml(label)}</figcaption></figure>`;
   }).join("");
+  const nextOffset = offset + visiblePhotos.length;
+  const loadMore = options.limit && nextOffset < photos.length
+    ? `<button class="btn btn-soft photo-load-more" type="button" data-load-more-photos>載入更多照片（還有 ${photos.length - nextOffset} 張）</button>`
+    : "";
+  return `${tiles}${loadMore}`;
 }
 
 function renderTravelTimeline(trip, photos, options = {}) {
@@ -2632,6 +2644,7 @@ function renderDrawer(trip, sharedMode) {
       </div>
     `
     : "";
+  const sharedPhotoVisibleCount = Math.max(SHARED_PHOTO_PAGE_SIZE, Number(state.sharedPhotoVisibleCount) || SHARED_PHOTO_PAGE_SIZE);
   const sharedPhotoGallery = sharedMode && photos.length
     ? `
       <section class="shared-photo-section">
@@ -2643,7 +2656,7 @@ function renderDrawer(trip, sharedMode) {
           ${sharedDownloadActions}
         </div>
         <div class="detail-photo-grid shared-photo-grid" id="sharedPhotoGrid">
-          ${renderDetailPhotoGrid(photos, "目前沒有照片", { selectable: true, lazy: true })}
+          ${renderDetailPhotoGrid(photos, "目前沒有照片", { selectable: true, lazy: true, limit: sharedPhotoVisibleCount })}
         </div>
       </section>
     `
@@ -2686,7 +2699,7 @@ function renderDrawer(trip, sharedMode) {
   $("editTripBtn")?.addEventListener("click", () => openTripDialog(trip));
   $("copyShareBtn")?.addEventListener("click", () => copyText(shareUrl));
   $("repairShareBtn")?.addEventListener("click", () => toggleTripSharing(trip, true));
-  $("sharedPhotoGrid")?.addEventListener("click", handleDetailPhotoClick);
+  $("sharedPhotoGrid")?.addEventListener("click", handleSharedPhotoGridClick);
   $("sharedPhotoGrid")?.addEventListener("keydown", handleDetailPhotoKeydown);
   $("sharedPhotoGrid")?.addEventListener("change", handleSharedPhotoSelection);
   $("downloadPhotoBtn")?.addEventListener("click", () => downloadCover(trip, sharedMode));
@@ -2695,6 +2708,16 @@ function renderDrawer(trip, sharedMode) {
   $("guestPhotoInput")?.addEventListener("change", (event) => prepareGuestPhotos(event, trip.share_token));
   $("confirmGuestUploadBtn")?.addEventListener("click", () => uploadGuestPhotos(trip.share_token));
   $("cancelGuestUploadBtn")?.addEventListener("click", () => resetGuestUploadState());
+}
+
+function handleSharedPhotoGridClick(event) {
+  const loadMoreButton = event.target.closest("[data-load-more-photos]");
+  if (loadMoreButton) {
+    state.sharedPhotoVisibleCount += SHARED_PHOTO_PAGE_SIZE;
+    renderDrawer(state.sharedTrip, true);
+    return;
+  }
+  handleDetailPhotoClick(event);
 }
 
 function handleSharedPhotoSelection(event) {
@@ -3573,6 +3596,7 @@ async function loadSharedTrip(token) {
     share_token: token,
     trip_photos: (sharedTrip.photos || sharedTrip.trip_photos || []).filter((photo) => photo.signed_url)
   };
+  state.sharedPhotoVisibleCount = SHARED_PHOTO_PAGE_SIZE;
   state.editingTrip = state.sharedTrip;
   state.trips = [state.sharedTrip];
   state.photoUrls.clear();

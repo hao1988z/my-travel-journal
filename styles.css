@@ -794,6 +794,12 @@ input:focus, textarea:focus, select:focus {
   display: none;
 }
 
+.shared-photo-grid .photo-load-more {
+  grid-column: 1 / -1;
+  justify-self: center;
+  margin: 8px 0 2px;
+}
+
 /* A public share link is a read-only view. Keep management controls hidden
    even if a stale render happens before the share-mode state is applied. */
 body.share-mode .home-new-trip,
