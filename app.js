@@ -1534,17 +1534,23 @@ function renderDetailSharePanel(trip) {
   if (!panel) return;
 
   const shareUrl = getShareUrl(trip?.share_token);
-  if (state.sharedMode || !trip || !state.user || trip._isGroup) {
+  // The owner must be able to share a parent trip group too. Shared visitors
+  // still do not see this management panel.
+  if (state.sharedMode || !trip || !state.user) {
     panel.hidden = true;
     panel.innerHTML = "";
     return;
   }
 
   panel.hidden = false;
+  const shareDescription = trip._isGroup
+    ? "朋友會先看到大行程總覽，再點入小行程查看內容與補照片"
+    : "擁有連結的人可以查看你公開的地點與照片";
+
   if (trip.is_shared && shareUrl) {
     panel.innerHTML =
       '<div class="detail-share-heading">' +
-        '<div><strong>分享這趟旅程</strong><span>擁有連結的人可以查看你公開的地點與照片</span></div>' +
+        '<div><strong>' + (trip._isGroup ? "分享這個大行程" : "分享這趟旅程") + '</strong><span>' + escapeHtml(shareDescription) + '</span></div>' +
         '<span class="detail-share-state">已開啟</span>' +
       '</div>' +
       '<div class="detail-share-link-row">' +
@@ -1561,7 +1567,7 @@ function renderDetailSharePanel(trip) {
   } else {
     panel.innerHTML =
       '<div class="detail-share-heading">' +
-        '<div><strong>分享這趟旅程</strong><span>目前為私人旅程，開啟後才會產生連結</span></div>' +
+        '<div><strong>' + (trip._isGroup ? "分享這個大行程" : "分享這趟旅程") + '</strong><span>目前為私人旅程，開啟後才會產生連結</span></div>' +
       '</div>' +
       '<button class="btn btn-primary" id="detailEnableShareBtn" type="button">開啟分享並取得連結</button>';
   }
@@ -2901,7 +2907,14 @@ function renderDrawer(trip, sharedMode) {
     ${guestUpload}
     ${!sharedMode && trip.is_shared
       ? shareUrl
-        ? `<p class="trip-meta">分享連結：${escapeHtml(shareUrl)}</p>`
+        ? `<section class="drawer-share-link" aria-label="分享連結">
+            <strong>分享連結</strong>
+            <input id="drawerShareUrlInput" type="text" value="${escapeHtml(shareUrl)}" readonly aria-label="分享連結網址">
+            <div class="drawer-share-link-actions">
+              <button class="btn btn-soft" id="copyDrawerShareBtn" type="button">複製連結</button>
+              <button class="btn btn-primary" id="openDrawerShareBtn" type="button">開啟連結</button>
+            </div>
+          </section>`
         : `<p class="trip-meta">這趟旅程缺少分享 token，請重新建立分享連結。</p>`
       : ""}
   `;
@@ -2910,6 +2923,11 @@ function renderDrawer(trip, sharedMode) {
   observeLazyPhotoImages($("sharedPhotoGrid"));
   $("editTripBtn")?.addEventListener("click", () => openTripDialog(trip));
   $("copyShareBtn")?.addEventListener("click", () => copyText(shareUrl));
+  $("copyDrawerShareBtn")?.addEventListener("click", () => copyText(shareUrl));
+  $("openDrawerShareBtn")?.addEventListener("click", () => {
+    if (!shareUrl) return toast("目前沒有可開啟的分享連結");
+    window.open(shareUrl, "_blank", "noopener");
+  });
   $("repairShareBtn")?.addEventListener("click", () => toggleTripSharing(trip, true));
   $("sharedParentBackBtn")?.addEventListener("click", () => loadSharedTrip(trip.share_token));
   $("sharedChildTripList")?.addEventListener("click", (event) => {

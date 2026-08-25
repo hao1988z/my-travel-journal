@@ -772,6 +772,39 @@ input:focus, textarea:focus, select:focus {
   margin-top: 18px;
 }
 
+.drawer-share-link {
+  display: grid;
+  gap: 9px;
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbf8f1;
+}
+
+.drawer-share-link strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.drawer-share-link input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  font: 11px/1.4 "DM Mono", monospace;
+}
+
+.drawer-share-link-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .shared-photo-section {
   margin-top: 20px;
   padding-top: 18px;
