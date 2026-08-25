@@ -7,6 +7,7 @@ const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const SIGNED_URL_CACHE_TTL_MS = 55 * 60 * 1000;
 const SIGNED_URL_BATCH_SIZE = 100;
 const MAX_UPLOAD_FILES = 200;
+const GUEST_UPLOAD_BATCH_SIZE = 25;
 
 const state = {
   user: null,
@@ -2581,8 +2582,9 @@ function renderDrawer(trip, sharedMode) {
   const guestUpload = sharedMode && trip.can_guest_upload
     ? `
       <label class="guest-upload">
-        朋友補照片
-        <input type="file" id="guestPhotoInput" accept="image/*">
+        朋友補照片（一次最多 ${MAX_UPLOAD_FILES} 張）
+        <input type="file" id="guestPhotoInput" accept="image/*" multiple>
+        <small>可一次選取多張照片，系統會分批上傳。</small>
       </label>
     `
     : "";
@@ -2645,7 +2647,7 @@ function renderDrawer(trip, sharedMode) {
   $("downloadPhotoBtn")?.addEventListener("click", () => downloadCover(trip, sharedMode));
   $("downloadAllPhotosBtn")?.addEventListener("click", () => downloadAllPhotos(trip, sharedMode));
   $("downloadSelectedPhotosBtn")?.addEventListener("click", () => downloadSelectedPhotos(trip, sharedMode));
-  $("guestPhotoInput")?.addEventListener("change", (event) => uploadGuestPhoto(event, trip.share_token));
+  $("guestPhotoInput")?.addEventListener("change", (event) => uploadGuestPhotos(event, trip.share_token));
 }
 
 function handleSharedPhotoSelection(event) {
@@ -3561,43 +3563,58 @@ async function downloadCover(trip, sharedMode) {
   }
 }
 
-async function uploadGuestPhoto(event, shareToken) {
+async function uploadGuestPhotos(event, shareToken) {
   if (!state.sharedMode || !state.sharedTrip?.can_guest_upload) {
     event.target.value = "";
     return toast("分享者沒有開放補照片");
   }
   const input = event.target;
-  const file = event.target.files[0];
-  if (!file) return;
-  if (!file.type.startsWith("image/")) return toast("請選擇圖片檔");
+  const files = [...event.target.files];
+  if (!files.length) return;
+  if (files.length > MAX_UPLOAD_FILES) {
+    input.value = "";
+    return toast(`朋友一次最多上傳 ${MAX_UPLOAD_FILES} 張照片`);
+  }
+  const invalidFile = files.find((file) => !file.type.startsWith("image/"));
+  if (invalidFile) {
+    input.value = "";
+    return toast(`「${invalidFile.name}」不是圖片檔`);
+  }
 
-  const form = new FormData();
-  form.append("share_token", shareToken);
-  form.append("photo", file);
-
+  let uploadedCount = 0;
   try {
-    const response = await fetch(`${cfg.SUPABASE_URL}/functions/v1/upload-shared-photo`, {
-      method: "POST",
-      headers: {
-        apikey: cfg.SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${cfg.SUPABASE_ANON_KEY}`
-      },
-      body: form
-    });
+    for (let offset = 0; offset < files.length; offset += GUEST_UPLOAD_BATCH_SIZE) {
+      const batch = files.slice(offset, offset + GUEST_UPLOAD_BATCH_SIZE);
+      const form = new FormData();
+      form.append("share_token", shareToken);
+      batch.forEach((file) => form.append("photos", file, file.name));
 
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const missingFunction = response.status === 404 || payload.code === "NOT_FOUND";
-      return toast(missingFunction
-        ? "補照片服務尚未部署，請通知網站管理者"
-        : (payload.error || "上傳失敗"));
+      const response = await fetch(`${cfg.SUPABASE_URL}/functions/v1/upload-shared-photo`, {
+        method: "POST",
+        headers: {
+          apikey: cfg.SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${cfg.SUPABASE_ANON_KEY}`
+        },
+        body: form
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const missingFunction = response.status === 404 || payload.code === "NOT_FOUND";
+        throw new Error(missingFunction
+          ? "補照片服務尚未部署，請通知網站管理者"
+          : (payload.error || "上傳失敗"));
+      }
+
+      uploadedCount += Number(payload.count) || batch.length;
+      toast(`補照片上傳中：${uploadedCount} / ${files.length}`);
     }
 
-    toast("照片已補上");
+    toast(`${uploadedCount} 張照片已補上`);
     await loadSharedTrip(shareToken);
   } catch (error) {
-    console.error("[uploadGuestPhoto]", error);
-    toast("補照片服務目前無法連線");
+    console.error("[uploadGuestPhotos]", error);
+    toast(`照片上傳中斷：已完成 ${uploadedCount} / ${files.length} 張` + (error.message ? `。${error.message}` : ""));
   } finally {
     input.value = "";
   }
