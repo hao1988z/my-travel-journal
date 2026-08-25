@@ -28,6 +28,9 @@ const state = {
   resendTimer: null,
   sharedMode: false,
   sharedTrip: null,
+  sharedChildren: [],
+  sharedParent: null,
+  sharedShareToken: "",
   diaryLoadError: "",
   schemaMode: "modern",
   storageBucket: bucket,
@@ -2781,6 +2784,9 @@ function renderDrawer(trip, sharedMode) {
   resetGuestUploadState();
   const cover = getCoverUrl(trip);
   const photos = getTripPhotos(trip);
+  const childTrips = sharedMode && Array.isArray(trip.child_trips) ? trip.child_trips : [];
+  const isSharedGroup = sharedMode && childTrips.length > 0;
+  const groupSummary = trip.group_summary || {};
   state.selectedDownloadIndexes = new Set();
   const shareUrl = getShareUrl(trip.share_token);
   const tags = (trip.tags || []).map((tag) => `<span class="chip">${escapeHtml(tag)}</span>`).join("");
@@ -2790,13 +2796,13 @@ function renderDrawer(trip, sharedMode) {
   const downloadAllButton = sharedMode && trip.can_download && photos.length
     ? `<button class="btn btn-primary" id="downloadAllPhotosBtn">下載全部照片（${photos.length}）</button>`
     : "";
- const downloadSelectedButton = sharedMode && trip.can_download && photos.length
-   ? `<button class="btn btn-soft" id="downloadSelectedPhotosBtn" type="button" disabled>下載選取照片（0）</button>`
-   : "";
+  const downloadSelectedButton = sharedMode && trip.can_download && photos.length
+    ? `<button class="btn btn-soft" id="downloadSelectedPhotosBtn" type="button" disabled>下載選取照片（0）</button>`
+    : "";
   const sharedDownloadActions = sharedMode && trip.can_download && photos.length
     ? `<div class="shared-photo-download-actions">${downloadSelectedButton}${downloadAllButton}</div>`
     : "";
-  const guestUpload = sharedMode && trip.can_guest_upload
+  const guestUpload = sharedMode && !isSharedGroup && trip.can_guest_upload
     ? `
       <div class="guest-upload">
         <label for="guestPhotoInput">朋友補照片（一次最多 ${MAX_UPLOAD_FILES} 張）</label>
@@ -2811,7 +2817,7 @@ function renderDrawer(trip, sharedMode) {
     `
     : "";
   const sharedPhotoVisibleCount = Math.max(SHARED_PHOTO_PAGE_SIZE, Number(state.sharedPhotoVisibleCount) || SHARED_PHOTO_PAGE_SIZE);
-  const sharedPhotoGallery = sharedMode && photos.length
+  const sharedPhotoGallery = sharedMode && !isSharedGroup && photos.length
     ? `
       <section class="shared-photo-section">
         <div class="shared-photo-section-head">
@@ -2827,7 +2833,45 @@ function renderDrawer(trip, sharedMode) {
       </section>
     `
     : "";
-  const sharedItinerary = sharedMode ? renderSharedItinerary(trip) : "";
+  const sharedItinerary = sharedMode && !isSharedGroup ? renderSharedItinerary(trip) : "";
+  const sharedParentBack = sharedMode && trip.shared_parent_id
+    ? `<button class="btn btn-soft shared-parent-back" id="sharedParentBackBtn" type="button">← 返回大行程總覽</button>`
+    : "";
+  const sharedGroupOverview = isSharedGroup
+    ? `
+      <section class="shared-group-overview">
+        <div class="shared-group-overview-head">
+          <div>
+            <strong>大行程總覽</strong>
+            <span>${childTrips.length} 個小行程</span>
+          </div>
+          <span>照片與補照片請進入小行程</span>
+        </div>
+        <p class="shared-group-note">先選擇要查看的日期與地點；朋友只能在小行程內補照片，避免照片混到整趟旅程。</p>
+        <div class="shared-group-stats">
+          <span><strong>${escapeHtml(groupSummary.start_date ? formatDate(groupSummary.start_date) : "未設定")}${groupSummary.end_date && groupSummary.end_date !== groupSummary.start_date ? ` — ${escapeHtml(formatDate(groupSummary.end_date))}` : ""}</strong><small>旅程日期</small></span>
+          <span><strong>${Number(groupSummary.photo_count) || 0}</strong><small>張照片</small></span>
+          <span><strong>${Number(groupSummary.diary_count) || 0}</strong><small>篇日記</small></span>
+          <span><strong>NT$ ${Math.round(Number(groupSummary.expense_total) || 0).toLocaleString("zh-TW")}</strong><small>旅程花費</small></span>
+        </div>
+        <div class="shared-child-trip-list" id="sharedChildTripList">
+          ${childTrips.map((child) => `
+            <button class="shared-child-trip" type="button" data-shared-child-id="${escapeHtml(child.id)}">
+              <span class="shared-child-trip-media">
+                ${child.cover_url ? `<img src="${escapeHtml(child.cover_url)}" alt="">` : "<span aria-hidden=\"true\">📍</span>"}
+              </span>
+              <span class="shared-child-trip-body">
+                <strong>${escapeHtml(child.title || child.location_name || "未命名小行程")}</strong>
+                <small>${escapeHtml(child.location_name || "")} · ${child.travel_date ? escapeHtml(formatDate(child.travel_date)) : "日期未設定"}</small>
+                <small>📷 ${Number(child.photo_count) || 0} 張 · 📝 ${Number(child.diary_count) || 0} 篇</small>
+              </span>
+              <span class="shared-child-trip-arrow" aria-hidden="true">查看 →</span>
+            </button>
+          `).join("")}
+        </div>
+      </section>
+    `
+    : "";
   const shareButton = !sharedMode && trip.is_shared
     ? shareUrl
       ? `<button class="btn btn-soft" id="copyShareBtn">複製分享連結</button>`
@@ -2836,22 +2880,24 @@ function renderDrawer(trip, sharedMode) {
 
   $("drawerTitle").textContent = trip.title || trip.location_name;
   $("drawerBody").innerHTML = `
+    ${sharedParentBack}
     ${cover ? `<img class="detail-photo" src="${escapeHtml(cover)}" alt="${escapeHtml(trip.location_name)}">` : ""}
     <div class="chip-row">
       <span class="chip private">${trip.is_shared ? "已開啟分享" : "私人"}</span>
       <span class="chip blue">${escapeHtml(trip.location_name)}</span>
-    ${trip.travel_date ? `<span class="chip blue">${formatDate(trip.travel_date)}</span>` : ""}
+      ${trip.travel_date ? `<span class="chip blue">${formatDate(trip.travel_date)}</span>` : ""}
       ${trip.mood ? `<span class="chip">${escapeHtml(trip.mood)}</span>` : ""}
       ${tags}
     </div>
     ${trip.diary ? `<div class="diary">${escapeHtml(trip.diary)}</div>` : ""}
+    ${sharedGroupOverview}
     ${sharedItinerary}
     ${sharedPhotoGallery}
     <div class="drawer-actions">
       ${!sharedMode ? `<button class="btn btn-primary" id="editTripBtn">編輯</button>` : ""}
-     ${shareButton}
-     ${photoButtons}
-   </div>
+      ${shareButton}
+      ${photoButtons}
+    </div>
     ${guestUpload}
     ${!sharedMode && trip.is_shared
       ? shareUrl
@@ -2865,14 +2911,20 @@ function renderDrawer(trip, sharedMode) {
   $("editTripBtn")?.addEventListener("click", () => openTripDialog(trip));
   $("copyShareBtn")?.addEventListener("click", () => copyText(shareUrl));
   $("repairShareBtn")?.addEventListener("click", () => toggleTripSharing(trip, true));
+  $("sharedParentBackBtn")?.addEventListener("click", () => loadSharedTrip(trip.share_token));
+  $("sharedChildTripList")?.addEventListener("click", (event) => {
+    const childButton = event.target.closest("[data-shared-child-id]");
+    if (!childButton) return;
+    loadSharedTrip(trip.share_token, childButton.dataset.sharedChildId);
+  });
   $("sharedPhotoGrid")?.addEventListener("click", handleSharedPhotoGridClick);
   $("sharedPhotoGrid")?.addEventListener("keydown", handleDetailPhotoKeydown);
   $("sharedPhotoGrid")?.addEventListener("change", handleSharedPhotoSelection);
   $("downloadPhotoBtn")?.addEventListener("click", () => downloadCover(trip, sharedMode));
   $("downloadAllPhotosBtn")?.addEventListener("click", () => downloadAllPhotos(trip, sharedMode));
   $("downloadSelectedPhotosBtn")?.addEventListener("click", () => downloadSelectedPhotos(trip, sharedMode));
-  $("guestPhotoInput")?.addEventListener("change", (event) => prepareGuestPhotos(event, trip.share_token));
-  $("confirmGuestUploadBtn")?.addEventListener("click", () => uploadGuestPhotos(trip.share_token));
+  $("guestPhotoInput")?.addEventListener("change", (event) => prepareGuestPhotos(event, trip.share_token, trip.id));
+  $("confirmGuestUploadBtn")?.addEventListener("click", () => uploadGuestPhotos(trip.share_token, trip.id));
   $("cancelGuestUploadBtn")?.addEventListener("click", () => resetGuestUploadState());
 }
 
@@ -3829,7 +3881,7 @@ async function deleteCurrentTrip() {
   await loadTrips();
 }
 
-async function loadSharedTrip(token) {
+async function loadSharedTrip(token, tripId = "") {
   if (missingConfig) {
     $("setupNote").textContent = "分享頁需要先設定 Supabase config.js。";
     return;
@@ -3847,7 +3899,10 @@ async function loadSharedTrip(token) {
   setTimeout(() => map.invalidateSize(), 80);
 
   const { data, error } = await client.functions.invoke("get-shared-trip", {
-    body: { share_token: token }
+    body: {
+      share_token: token,
+      ...(tripId ? { trip_id: tripId } : {})
+    }
   });
 
   const sharedTrip = Array.isArray(data) ? data[0] : data;
@@ -3871,6 +3926,14 @@ async function loadSharedTrip(token) {
     share_token: token,
     trip_photos: (sharedTrip.photos || sharedTrip.trip_photos || []).filter((photo) => photo.signed_url)
   };
+  state.sharedShareToken = token;
+  state.sharedChildren = Array.isArray(state.sharedTrip.child_trips) ? state.sharedTrip.child_trips : [];
+  state.sharedParent = state.sharedTrip.shared_parent_id
+    ? {
+        id: state.sharedTrip.shared_parent_id,
+        title: state.sharedTrip.shared_parent_title || "大行程總覽"
+      }
+    : null;
   state.sharedPhotoVisibleCount = SHARED_PHOTO_PAGE_SIZE;
   state.editingTrip = state.sharedTrip;
   state.trips = [state.sharedTrip];
@@ -3954,7 +4017,7 @@ function renderGuestUploadPreview() {
   cancelButton.hidden = false;
 }
 
-function prepareGuestPhotos(event, shareToken) {
+function prepareGuestPhotos(event, shareToken, tripId) {
   if (!state.sharedMode || !state.sharedTrip?.can_guest_upload) {
     resetGuestUploadState();
     return toast("分享者沒有開放補照片");
@@ -3978,18 +4041,20 @@ function prepareGuestPhotos(event, shareToken) {
     return toast(`「${invalidFile.name}」不是圖片檔`);
   }
 
-  state.pendingGuestUpload = { files, shareToken };
+  state.pendingGuestUpload = { files, shareToken, tripId };
   state.pendingGuestPreviewUrls = files.slice(0, 12).map((file) => URL.createObjectURL(file));
   renderGuestUploadPreview();
 }
 
-async function uploadGuestPhotos(shareToken) {
+async function uploadGuestPhotos(shareToken, tripId) {
   const pending = state.pendingGuestUpload;
   if (!state.sharedMode || !state.sharedTrip?.can_guest_upload) {
     resetGuestUploadState();
     return toast("分享者沒有開放補照片");
   }
-  if (!pending || pending.shareToken !== shareToken) return toast("請先選取要上傳的照片");
+  if (!pending || pending.shareToken !== shareToken || String(pending.tripId) !== String(tripId)) {
+    return toast("請先選取要上傳的照片");
+  }
 
   const files = pending.files;
   const confirmButton = $("confirmGuestUploadBtn");
@@ -4003,6 +4068,7 @@ async function uploadGuestPhotos(shareToken) {
       const batch = files.slice(offset, offset + GUEST_UPLOAD_BATCH_SIZE);
       const form = new FormData();
       form.append("share_token", shareToken);
+      form.append("trip_id", tripId);
       batch.forEach((file) => form.append("photos", file, file.name));
 
       const response = await fetch(`${cfg.SUPABASE_URL}/functions/v1/upload-shared-photo`, {
@@ -4028,7 +4094,7 @@ async function uploadGuestPhotos(shareToken) {
     }
 
     toast(`${uploadedCount} 張照片已補上`);
-    await loadSharedTrip(shareToken);
+    await loadSharedTrip(shareToken, tripId);
   } catch (error) {
     console.error("[uploadGuestPhotos]", error);
     toast(`照片上傳中斷：已完成 ${uploadedCount} / ${files.length} 張` + (error.message ? `。${error.message}` : ""));

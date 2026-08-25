@@ -830,6 +830,131 @@ input:focus, textarea:focus, select:focus {
   margin: 8px 0 2px;
 }
 
+.shared-parent-back {
+  margin-bottom: 12px;
+}
+
+.shared-group-overview {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.shared-group-overview-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.shared-group-overview-head > div {
+  display: grid;
+  gap: 3px;
+}
+
+.shared-group-overview-head strong {
+  font-family: "Noto Serif TC", serif;
+  font-size: 18px;
+}
+
+.shared-group-overview-head span,
+.shared-group-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.shared-group-note {
+  line-height: 1.7;
+  margin: 10px 0 12px;
+}
+
+.shared-group-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.shared-group-stats span {
+  display: grid;
+  gap: 2px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  background: var(--field);
+}
+
+.shared-group-stats strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.shared-group-stats small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.shared-child-trip-list {
+  display: grid;
+  gap: 8px;
+}
+
+.shared-child-trip {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.shared-child-trip:hover,
+.shared-child-trip:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.shared-child-trip-media {
+  width: 68px;
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #e9e2d5;
+  color: var(--accent-2);
+  font-size: 20px;
+}
+
+.shared-child-trip-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.shared-child-trip-body {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.shared-child-trip-body strong,
+.shared-child-trip-body small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shared-child-trip-body strong { font-size: 14px; }
+.shared-child-trip-body small { color: var(--muted); font-size: 11px; }
+.shared-child-trip-arrow { color: var(--accent); font-size: 12px; white-space: nowrap; }
+
 /* A public share link is a read-only view. Keep management controls hidden
    even if a stale render happens before the share-mode state is applied. */
 body.share-mode .home-new-trip,
@@ -2487,6 +2612,28 @@ body.share-mode .detail-drawer {
     order: 2;
     height: 280px;
     min-height: 280px;
+  }
+
+  .shared-group-overview-head {
+    display: grid;
+    gap: 5px;
+  }
+
+  .shared-group-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .shared-child-trip {
+    grid-template-columns: 58px minmax(0, 1fr);
+  }
+
+  .shared-child-trip-media {
+    width: 58px;
+  }
+
+  .shared-child-trip-arrow {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .app-shell,
