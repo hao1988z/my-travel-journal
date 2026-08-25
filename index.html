@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=20260825-shared-photo-lazy-2">
+    <link rel="stylesheet" href="./styles.css?v=20260825-trip-groups-1">
 </head>
 <body>
   <header class="topbar">
@@ -100,7 +100,10 @@
             <p class="section-kicker">TRAVEL ARCHIVE</p>
             <h2 id="tripArchiveHeading">所有旅程</h2>
           </div>
-          <input type="search" id="searchInput" placeholder="搜尋旅程、地點、日期..." aria-label="搜尋旅程">
+          <div class="archive-heading-actions">
+            <button class="btn btn-soft" id="createGroupBtn" type="button">＋ 建立大行程</button>
+            <input type="search" id="searchInput" placeholder="搜尋旅程、地點、日期..." aria-label="搜尋旅程">
+          </div>
         </div>
         <div class="stats-row">
           <span><strong id="placeCount">0</strong> 趟旅程</span>
@@ -160,6 +163,13 @@
           <div class="detail-stat"><span>地點</span><strong id="detailPlaceCount">1</strong></div>
         </div>
 
+        <section class="detail-section detail-group-section" id="detailGroupSection" hidden>
+          <div class="detail-section-head">
+            <div><p class="detail-section-eyebrow">ITINERARY COLLECTION</p><h2>小行程</h2><p id="detailGroupSummary"></p></div>
+          </div>
+          <div class="group-child-list" id="detailGroupChildren"></div>
+        </section>
+
         <section class="detail-share-panel" id="detailSharePanel" hidden></section>
 
         <div class="detail-content-grid">
@@ -208,7 +218,7 @@
       <div class="detail-panel" id="detail-panel-photos" hidden>
         <div class="detail-panel-heading detail-panel-heading-row">
           <div><p class="detail-section-eyebrow">TRAVEL TIMELINE</p><h2>旅行時間軸</h2><p id="detailPhotosSummary"></p></div>
-          <div class="detail-photo-management-actions">
+          <div class="detail-photo-management-actions" id="detailPhotoManagementActions">
             <button class="btn btn-soft" type="button" id="selectAllDetailPhotosBtn">全選照片</button>
             <button class="btn btn-ghost" type="button" id="clearDetailPhotoSelectionBtn">取消選取</button>
             <button class="btn btn-danger" type="button" id="deleteSelectedDetailPhotosBtn" disabled>刪除選取照片（0）</button>
@@ -409,6 +419,25 @@
     </form>
   </dialog>
 
+  <dialog class="trip-dialog group-dialog" id="groupDialog">
+    <form class="trip-form" id="groupForm">
+      <div class="dialog-head">
+        <div><p class="detail-section-eyebrow">TRIP COLLECTION</p><h3>建立大行程</h3></div>
+        <button class="icon-btn" type="button" id="closeGroupDialogBtn" aria-label="關閉">×</button>
+      </div>
+      <label>
+        大行程名稱
+        <input type="text" id="groupTitleInput" placeholder="上海・蘇州 2026" required>
+      </label>
+      <div class="group-trip-choices" id="groupTripChoices"></div>
+      <p class="trip-form-status" id="groupFormStatus" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button class="btn btn-soft" type="button" id="cancelGroupDialogBtn">取消</button>
+        <button class="btn btn-primary" id="saveGroupBtn" type="submit">建立大行程</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog class="trip-dialog stop-dialog" id="stopDialog">
     <form class="trip-form" id="stopForm">
       <div class="dialog-head">
@@ -546,6 +575,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="./config.js?v=20260825-login-fix-1"></script>
-  <script src="./app.js?v=20260825-shared-photo-lazy-2"></script>
+  <script src="./app.js?v=20260825-trip-groups-1"></script>
 </body>
 </html>
