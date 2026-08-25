@@ -3084,7 +3084,7 @@ async function saveTripGroup(event) {
     const detail = [error?.message, error?.details, error?.hint].filter(Boolean).join(" · ");
     const missingColumn = /parent_trip_id|column .* does not exist|schema cache/i.test(detail);
     const message = missingColumn
-      ? "大行程欄位尚未同步，請確認已在目前 Supabase 專案執行 20260825_trip_groups.sql，稍候再試。"
+      ? `Supabase 更新欄位失敗：${detail || "parent_trip_id 尚未同步"}`
       : detail || "大行程建立失敗";
     toast(message);
     $("groupFormStatus").textContent = "建立失敗：" + message + "。既有旅程沒有被修改。";
