@@ -1863,6 +1863,56 @@ body.share-mode .detail-drawer {
   background: var(--field);
 }
 
+.guest-upload > label {
+  display: block;
+  font-weight: 700;
+}
+
+.guest-upload > input[type="file"] {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.guest-upload > small {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.guest-upload-preview {
+  margin-top: 12px;
+}
+
+.guest-upload-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.guest-upload-preview-tile {
+  aspect-ratio: 1;
+  overflow: hidden;
+  margin: 0;
+  border-radius: 6px;
+  background: var(--line);
+}
+
+.guest-upload-preview-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.guest-upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2726,6 +2776,7 @@ body.share-mode .detail-drawer {
   }
 
   .photo-preview-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .guest-upload-preview-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .photo-viewer-actions { flex-direction: column; align-items: stretch; }
 
   .detail-expense-total {

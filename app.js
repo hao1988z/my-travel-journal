@@ -21,6 +21,8 @@ const state = {
   isSavingTrip: false,
   selectedPhotos: [],
   photoPreviewUrls: [],
+  pendingGuestUpload: null,
+  pendingGuestPreviewUrls: [],
   pendingEmail: "",
   resendTimer: null,
   sharedMode: false,
@@ -2562,6 +2564,7 @@ async function toggleTripSharing(trip, nextValue = !trip?.is_shared) {
 }
 
 function renderDrawer(trip, sharedMode) {
+  resetGuestUploadState();
   const cover = getCoverUrl(trip);
   const photos = getTripPhotos(trip);
   state.selectedDownloadIndexes = new Set();
@@ -2581,11 +2584,16 @@ function renderDrawer(trip, sharedMode) {
     : "";
   const guestUpload = sharedMode && trip.can_guest_upload
     ? `
-      <label class="guest-upload">
-        朋友補照片（一次最多 ${MAX_UPLOAD_FILES} 張）
+      <div class="guest-upload">
+        <label for="guestPhotoInput">朋友補照片（一次最多 ${MAX_UPLOAD_FILES} 張）</label>
         <input type="file" id="guestPhotoInput" accept="image/*" multiple>
-        <small>可一次選取多張照片，系統會分批上傳。</small>
-      </label>
+        <small>選取後會先預覽，按「確認上傳」才會送出照片。</small>
+        <div id="guestUploadPreview" class="guest-upload-preview" hidden></div>
+        <div class="guest-upload-actions">
+          <button class="btn btn-primary" id="confirmGuestUploadBtn" type="button" disabled>確認上傳（0 張）</button>
+          <button class="btn btn-soft" id="cancelGuestUploadBtn" type="button" hidden>取消選取</button>
+        </div>
+      </div>
     `
     : "";
   const sharedPhotoGallery = sharedMode && photos.length
@@ -2647,7 +2655,9 @@ function renderDrawer(trip, sharedMode) {
   $("downloadPhotoBtn")?.addEventListener("click", () => downloadCover(trip, sharedMode));
   $("downloadAllPhotosBtn")?.addEventListener("click", () => downloadAllPhotos(trip, sharedMode));
   $("downloadSelectedPhotosBtn")?.addEventListener("click", () => downloadSelectedPhotos(trip, sharedMode));
-  $("guestPhotoInput")?.addEventListener("change", (event) => uploadGuestPhotos(event, trip.share_token));
+  $("guestPhotoInput")?.addEventListener("change", (event) => prepareGuestPhotos(event, trip.share_token));
+  $("confirmGuestUploadBtn")?.addEventListener("click", () => uploadGuestPhotos(trip.share_token));
+  $("cancelGuestUploadBtn")?.addEventListener("click", () => resetGuestUploadState());
 }
 
 function handleSharedPhotoSelection(event) {
@@ -3563,26 +3573,91 @@ async function downloadCover(trip, sharedMode) {
   }
 }
 
-async function uploadGuestPhotos(event, shareToken) {
+function resetGuestUploadState({ clearInput = true } = {}) {
+  state.pendingGuestPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+  state.pendingGuestPreviewUrls = [];
+  state.pendingGuestUpload = null;
+
+  const input = $("guestPhotoInput");
+  if (clearInput && input) input.value = "";
+
+  const preview = $("guestUploadPreview");
+  const confirmButton = $("confirmGuestUploadBtn");
+  const cancelButton = $("cancelGuestUploadBtn");
+  if (preview) {
+    preview.hidden = true;
+    preview.innerHTML = "";
+  }
+  if (confirmButton) {
+    confirmButton.disabled = true;
+    confirmButton.textContent = "確認上傳（0 張）";
+  }
+  if (cancelButton) cancelButton.hidden = true;
+}
+
+function renderGuestUploadPreview() {
+  const pending = state.pendingGuestUpload;
+  const preview = $("guestUploadPreview");
+  const confirmButton = $("confirmGuestUploadBtn");
+  const cancelButton = $("cancelGuestUploadBtn");
+  if (!pending || !preview || !confirmButton || !cancelButton) return;
+
+  const thumbnails = state.pendingGuestPreviewUrls.map((url, index) => `
+    <figure class="guest-upload-preview-tile">
+      <img src="${escapeHtml(url)}" alt="${escapeHtml(pending.files[index].name)}">
+    </figure>
+  `).join("");
+  const remaining = pending.files.length - state.pendingGuestPreviewUrls.length;
+  preview.innerHTML = `
+    <div class="guest-upload-preview-grid">${thumbnails}</div>
+    <strong>已選 ${pending.files.length} 張照片${remaining > 0 ? `，另有 ${remaining} 張將一併上傳` : ""}</strong>
+  `;
+  preview.hidden = false;
+  confirmButton.disabled = false;
+  confirmButton.textContent = `確認上傳（${pending.files.length} 張）`;
+  cancelButton.hidden = false;
+}
+
+function prepareGuestPhotos(event, shareToken) {
   if (!state.sharedMode || !state.sharedTrip?.can_guest_upload) {
-    event.target.value = "";
+    resetGuestUploadState();
     return toast("分享者沒有開放補照片");
   }
-  const input = event.target;
+
   const files = [...event.target.files];
+  resetGuestUploadState({ clearInput: false });
   if (!files.length) return;
   if (files.length > MAX_UPLOAD_FILES) {
-    input.value = "";
+    event.target.value = "";
     return toast(`朋友一次最多上傳 ${MAX_UPLOAD_FILES} 張照片`);
   }
   const invalidFile = files.find((file) => !file.type.startsWith("image/"));
   if (invalidFile) {
-    input.value = "";
+    event.target.value = "";
     return toast(`「${invalidFile.name}」不是圖片檔`);
   }
 
+  state.pendingGuestUpload = { files, shareToken };
+  state.pendingGuestPreviewUrls = files.slice(0, 12).map((file) => URL.createObjectURL(file));
+  renderGuestUploadPreview();
+}
+
+async function uploadGuestPhotos(shareToken) {
+  const pending = state.pendingGuestUpload;
+  if (!state.sharedMode || !state.sharedTrip?.can_guest_upload) {
+    resetGuestUploadState();
+    return toast("分享者沒有開放補照片");
+  }
+  if (!pending || pending.shareToken !== shareToken) return toast("請先選取要上傳的照片");
+
+  const files = pending.files;
+  const confirmButton = $("confirmGuestUploadBtn");
+  const cancelButton = $("cancelGuestUploadBtn");
+
   let uploadedCount = 0;
   try {
+    if (confirmButton) confirmButton.disabled = true;
+    if (cancelButton) cancelButton.hidden = true;
     for (let offset = 0; offset < files.length; offset += GUEST_UPLOAD_BATCH_SIZE) {
       const batch = files.slice(offset, offset + GUEST_UPLOAD_BATCH_SIZE);
       const form = new FormData();
@@ -3616,7 +3691,7 @@ async function uploadGuestPhotos(event, shareToken) {
     console.error("[uploadGuestPhotos]", error);
     toast(`照片上傳中斷：已完成 ${uploadedCount} / ${files.length} 張` + (error.message ? `。${error.message}` : ""));
   } finally {
-    input.value = "";
+    resetGuestUploadState();
   }
 }
 
