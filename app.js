@@ -27,9 +27,10 @@ const state = {
   diaryLoadError: "",
   schemaMode: "modern",
   storageBucket: bucket,
- viewerPhotos: [],
- viewerIndex: 0,
- selectedDownloadIndexes: new Set(),
+  viewerPhotos: [],
+  viewerIndex: 0,
+  viewerZoom: 1,
+  selectedDownloadIndexes: new Set(),
   selectedDeleteIndexes: new Set(),
   locationResults: [],
   stopLocationResults: [],
@@ -145,6 +146,11 @@ function bindEvents() {
   $("coverPickerGrid").addEventListener("click", handleCoverPickerClick);
   $("photoViewerPrevBtn").addEventListener("click", () => changePhotoViewer(-1));
   $("photoViewerNextBtn").addEventListener("click", () => changePhotoViewer(1));
+  $("photoViewerZoomOutBtn").addEventListener("click", () => changeViewerZoom(-0.25));
+  $("photoViewerZoomResetBtn").addEventListener("click", resetViewerZoom);
+  $("photoViewerZoomInBtn").addEventListener("click", () => changeViewerZoom(0.25));
+  $("photoViewerImage").addEventListener("click", toggleViewerZoom);
+  $("photoViewerStage").addEventListener("wheel", handleViewerWheel, { passive: false });
   $("photoViewerDownloadBtn").addEventListener("click", downloadViewerPhoto);
   $("photoViewerCoverBtn").addEventListener("click", setViewerPhotoAsCover);
   $("photoViewerDeleteBtn").addEventListener("click", deleteViewerPhoto);
@@ -1869,6 +1875,7 @@ async function openPhotoViewer(index) {
   if (!photos[index]) return;
   state.viewerPhotos = photos;
   state.viewerIndex = Math.max(0, Math.min(index, photos.length - 1));
+  state.viewerZoom = 1;
   $("photoViewer").showModal();
   await ensurePhotoUrl(state.viewerPhotos[state.viewerIndex]);
   renderPhotoViewer();
@@ -1897,6 +1904,7 @@ function renderPhotoViewer() {
   $("photoViewerCounter").textContent = `${state.viewerIndex + 1} / ${state.viewerPhotos.length}`;
   $("photoViewerImage").hidden = !url;
   $("photoViewerImage").src = url;
+  applyViewerZoom();
   $("photoViewerMissing").hidden = !!url;
   $("photoViewerPrevBtn").hidden = state.viewerPhotos.length < 2;
   $("photoViewerNextBtn").hidden = state.viewerPhotos.length < 2;
@@ -1914,8 +1922,43 @@ function renderPhotoViewer() {
 async function changePhotoViewer(direction) {
   if (!state.viewerPhotos.length) return;
   state.viewerIndex = (state.viewerIndex + direction + state.viewerPhotos.length) % state.viewerPhotos.length;
+  state.viewerZoom = 1;
   await ensurePhotoUrl(state.viewerPhotos[state.viewerIndex]);
   renderPhotoViewer();
+}
+
+function applyViewerZoom() {
+  const image = $("photoViewerImage");
+  if (!image) return;
+  const zoom = Math.min(3, Math.max(1, state.viewerZoom));
+  state.viewerZoom = zoom;
+  image.style.transform = `scale(${zoom})`;
+  image.classList.toggle("is-zoomed", zoom > 1);
+  $("photoViewerZoomResetBtn").textContent = `${Math.round(zoom * 100)}%`;
+  $("photoViewerZoomOutBtn").disabled = zoom <= 1;
+  $("photoViewerZoomInBtn").disabled = zoom >= 3;
+}
+
+function changeViewerZoom(step) {
+  if (!state.viewerPhotos.length) return;
+  state.viewerZoom += step;
+  applyViewerZoom();
+}
+
+function resetViewerZoom() {
+  state.viewerZoom = 1;
+  applyViewerZoom();
+}
+
+function toggleViewerZoom() {
+  state.viewerZoom = state.viewerZoom > 1 ? 1 : 2;
+  applyViewerZoom();
+}
+
+function handleViewerWheel(event) {
+  if (!$("photoViewer")?.open || !state.viewerPhotos.length) return;
+  event.preventDefault();
+  changeViewerZoom(event.deltaY < 0 ? 0.25 : -0.25);
 }
 
 function closePhotoViewer() {
@@ -1923,6 +1966,7 @@ function closePhotoViewer() {
   if (viewer?.open) viewer.close();
   state.viewerPhotos = [];
   state.viewerIndex = 0;
+  state.viewerZoom = 1;
 }
 
 async function downloadViewerPhoto() {
