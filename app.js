@@ -3040,7 +3040,6 @@ async function saveTripGroup(event) {
     lat: numberOrNull(first.lat),
     lng: numberOrNull(first.lng),
     travel_date: dates[0] || null,
-    travel_date_end: dates[dates.length - 1] || dates[0] || null,
     mood: null,
     diary: null,
     tags: ["大行程"],
