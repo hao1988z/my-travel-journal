@@ -1497,6 +1497,10 @@ body.share-mode .detail-drawer {
   margin-top: 18px;
 }
 
+.detail-content-grid > .detail-section {
+  min-width: 0;
+}
+
 .detail-section {
   min-width: 0;
   padding: 24px;
@@ -1530,8 +1534,11 @@ body.share-mode .detail-drawer {
 
 .detail-route {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
+  align-content: flex-start;
+  gap: 10px 12px;
+  min-width: 0;
   min-height: 56px;
   color: var(--ink);
   font: 500 20px "Noto Serif TC", serif;
@@ -1547,8 +1554,19 @@ body.share-mode .detail-drawer {
   box-shadow: 0 0 0 5px #f7eddc;
 }
 
-.detail-route-stop { overflow-wrap: anywhere; }
-.detail-route-arrow { color: var(--accent-2); font-family: system-ui, sans-serif; font-size: 17px; }
+.detail-route-stop {
+  min-width: 0;
+  max-width: min(100%, 12ch);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.detail-route-arrow {
+  flex: 0 0 auto;
+  color: var(--accent-2);
+  font-family: system-ui, sans-serif;
+  font-size: 17px;
+}
 .detail-muted { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
 
 .detail-diary-preview,

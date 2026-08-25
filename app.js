@@ -1448,7 +1448,8 @@ function renderTripDetail(trip) {
   $("detailPhotoManagementActions").hidden = isGroup;
   const coverEditorButton = $("detailSetCoverBtn");
   if (coverEditorButton) {
-    coverEditorButton.hidden = state.sharedMode || !state.user || photos.length === 0 || isGroup;
+    coverEditorButton.hidden = state.sharedMode || !state.user || photos.length === 0;
+    coverEditorButton.textContent = isGroup ? "編輯大行程封面" : "編輯封面";
   }
 
   $("detailDays").textContent = formatTripDays(dateStart, dateEnd);
@@ -1603,11 +1604,16 @@ async function openCoverEditor() {
   const picker = $("coverPicker");
   if (!picker) return;
   picker.showModal();
-  $("coverPickerStatus").textContent = `正在準備 ${photos.length} 張照片…`;
+  $("coverPickerTitle").textContent = trip._isGroup ? "選擇大行程封面" : "選擇旅程封面";
+  $("coverPickerStatus").textContent = trip._isGroup
+    ? `正在準備 ${photos.length} 張小行程照片…`
+    : `正在準備 ${photos.length} 張照片…`;
   renderCoverPicker(trip, photos);
   await hydratePhotoUrls(photos.map((photo) => photo.storage_path));
   if (state.editingTrip && String(state.editingTrip.id) === String(trip.id) && picker.open) {
-    $("coverPickerStatus").textContent = `共 ${photos.length} 張照片 · 點選照片即可設為封面`;
+    $("coverPickerStatus").textContent = trip._isGroup
+      ? `共 ${photos.length} 張小行程照片 · 點選照片即可設為大行程封面`
+      : `共 ${photos.length} 張照片 · 點選照片即可設為封面`;
     renderCoverPicker(trip, photos);
   }
 }
@@ -1625,9 +1631,10 @@ function renderCoverPicker(trip, photos) {
     const label = photo.original_name || photo.name || `照片 ${index + 1}`;
     const isCurrent = photo.storage_path && photo.storage_path === trip.cover_path;
     const canUse = !!photo.storage_path;
-    return `<button class="cover-picker-card${isCurrent ? " is-current" : ""}" type="button" data-cover-photo-index="${index}" aria-pressed="${isCurrent ? "true" : "false"}" aria-label="${escapeHtml(isCurrent ? `${label}，目前封面` : `將 ${label} 設為封面`)}"${canUse ? "" : " disabled"}>
+    const coverAction = trip._isGroup ? "設為大行程封面" : "設為封面";
+    return `<button class="cover-picker-card${isCurrent ? " is-current" : ""}" type="button" data-cover-photo-index="${index}" aria-pressed="${isCurrent ? "true" : "false"}" aria-label="${escapeHtml(isCurrent ? `${label}，目前封面` : `將 ${label} 設為${trip._isGroup ? "大行程" : "旅程"}封面`)}"${canUse ? "" : " disabled"}>
       <span class="cover-picker-image">${url ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy" decoding="async">` : `<span class="cover-picker-placeholder">照片載入中</span>`}</span>
-      <span class="cover-picker-card-foot"><strong>${escapeHtml(label)}</strong><span>${isCurrent ? "目前封面" : "設為封面"}</span></span>
+      <span class="cover-picker-card-foot"><strong>${escapeHtml(label)}</strong><span>${isCurrent ? "目前封面" : coverAction}</span></span>
     </button>`;
   }).join("");
 }
@@ -2147,11 +2154,13 @@ function renderPhotoViewer() {
   $("photoViewerNextBtn").hidden = state.viewerPhotos.length < 2;
   $("photoViewerDownloadBtn").hidden = !url || (state.sharedMode && !state.editingTrip?.can_download);
   const coverButton = $("photoViewerCoverBtn");
-  const canSetCover = !state.sharedMode && !!state.user && !state.editingTrip?._isGroup && !!photo.storage_path;
+  const canSetCover = !state.sharedMode && !!state.user && !!photo.storage_path;
   if (coverButton) {
     coverButton.hidden = !canSetCover;
     coverButton.disabled = !canSetCover || photo.storage_path === state.editingTrip?.cover_path;
-    coverButton.textContent = photo.storage_path === state.editingTrip?.cover_path ? "目前封面" : "設為封面";
+    coverButton.textContent = photo.storage_path === state.editingTrip?.cover_path
+      ? "目前封面"
+      : (state.editingTrip?._isGroup ? "設為大行程封面" : "設為封面");
   }
   $("photoViewerDeleteBtn").hidden = state.sharedMode || !state.user || !!state.editingTrip?._isGroup;
 }
@@ -2222,7 +2231,7 @@ async function setViewerPhotoAsCover() {
 
 async function setTripPhotoAsCover(photo) {
   const trip = state.editingTrip;
-  if (state.sharedMode || !state.user || !trip || trip._isGroup || !photo) return;
+  if (state.sharedMode || !state.user || !trip || !photo) return;
   if (!photo.storage_path) return toast("這張照片沒有可使用的檔案路徑");
   if (photo.storage_path === trip.cover_path) return;
 
@@ -2257,8 +2266,10 @@ async function setTripPhotoAsCover(photo) {
     renderTripDetail(trip);
     renderCoverPicker(trip, getTripPhotos(trip));
     const pickerStatus = $("coverPickerStatus");
-    if (pickerStatus) pickerStatus.textContent = `已設定目前封面 · 共 ${getTripPhotos(trip).length} 張照片`;
-    toast("已設定為旅程封面");
+    if (pickerStatus) pickerStatus.textContent = trip._isGroup
+      ? `已設定大行程封面 · 共 ${getTripPhotos(trip).length} 張小行程照片`
+      : `已設定目前封面 · 共 ${getTripPhotos(trip).length} 張照片`;
+    toast(trip._isGroup ? "已設定為大行程封面" : "已設定為旅程封面");
   } catch (error) {
     console.error("[setViewerPhotoAsCover]", error);
     if (error?.code === "PGRST204" || error?.code === "42703") {
