@@ -3681,9 +3681,10 @@ async function uploadGuestPhotos(shareToken) {
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
         const missingFunction = response.status === 404 || payload.code === "NOT_FOUND";
+        const diagnosticCode = payload.diagnostic_code ? `（錯誤代碼：${payload.diagnostic_code}）` : "";
         throw new Error(missingFunction
           ? "補照片服務尚未部署，請通知網站管理者"
-          : (payload.detail || payload.error || "上傳失敗"));
+          : `${payload.detail || payload.error || "上傳失敗"}${diagnosticCode}`);
       }
 
       uploadedCount += Number(payload.count) || batch.length;

@@ -9,6 +9,7 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const photoBucket = Deno.env.get("PHOTO_BUCKET") || "trip-photos";
+const MAX_GUEST_UPLOAD_FILES = 200;
 const admin = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false }
 });
@@ -29,115 +30,32 @@ function parsePhotosMeta(value: unknown) {
           try { return JSON.parse(value); } catch { return []; }
         })()
       : [];
-  if (!Array.isArray(parsed)) return [];
-  return parsed
-    .filter((photo) => photo && typeof photo === "object")
-    .map((photo) => ({
-      ...photo,
-      storage_path: photo.storage_path || photo.path || ""
-    }))
-    .filter((photo) => photo.storage_path);
+  return Array.isArray(parsed) ? parsed.filter((photo) => photo && typeof photo === "object") : [];
 }
 
-async function signPhotoPaths(paths: string[]) {
-  const signedByPath = new Map<string, string>();
-  const uniquePaths = [...new Set(paths.filter(Boolean))];
-
-  // Keep batches small so a large travel album does not exceed the Storage request limit.
-  for (let index = 0; index < uniquePaths.length; index += 100) {
-    const batch = uniquePaths.slice(index, index + 100);
-    const { data, error } = await admin.storage
-      .from(photoBucket)
-      .createSignedUrls(batch, 60 * 60);
-    if (error) {
-      console.error("[get-shared-trip.signPhotos]", error);
-      continue;
-    }
-    (data || []).forEach((item) => {
-      if (item?.path && item.signedUrl) signedByPath.set(item.path, item.signedUrl);
-    });
-  }
-
-  return signedByPath;
+function extensionFor(file: File) {
+  const fromType = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+    "image/heic": "heic",
+    "image/heif": "heif"
+  }[file.type.toLowerCase()];
+  if (fromType) return fromType;
+  const fromName = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return fromName && ["jpg", "jpeg", "png", "webp", "gif", "heic", "heif"].includes(fromName)
+    ? fromName
+    : "jpg";
 }
 
-async function loadPhotos(trip: Record<string, unknown>) {
-  const modernResult = await admin
-    .from("trip_photos")
-    .select("*")
-    .eq("trip_id", trip.id)
-    .order("created_at", { ascending: true });
-
-  const modernTableMissing = modernResult.error?.code === "PGRST205" || modernResult.error?.code === "42P01";
-  const legacyRows = parsePhotosMeta(trip.photos_meta);
-  const modernRows = !modernResult.error ? (modernResult.data || []) : [];
-  const rows = modernRows.length
-    ? modernRows
-    : modernTableMissing || !modernResult.error
-      ? legacyRows
-      : [];
-
-  if (modernResult.error && !modernTableMissing) {
-    console.error("[get-shared-trip.loadPhotos]", modernResult.error);
-  }
-
-  const signedByPath = await signPhotoPaths(rows.map((photo) => photo.storage_path || photo.path));
-  return rows
-    .map((photo) => {
-      const storagePath = photo.storage_path || photo.path;
-      return {
-        ...photo,
-        storage_path: storagePath,
-        signed_url: signedByPath.get(storagePath) || ""
-      };
-    })
-    .filter((photo) => photo.signed_url);
-}
-
-async function loadItinerary(tripId: string) {
-  const daysResult = await admin
-    .from("trip_days")
-    .select("*")
-    .eq("trip_id", tripId)
-    .order("sort_order", { ascending: true })
-    .order("day_number", { ascending: true });
-
-  const daysTableMissing = daysResult.error?.code === "PGRST205" || daysResult.error?.code === "42P01";
-  if (daysTableMissing) return [];
-  if (daysResult.error) {
-    console.error("[get-shared-trip.loadItinerary.days]", daysResult.error);
-    return [];
-  }
-
-  const days = daysResult.data || [];
-  const dayIds = days.map((day) => day.id).filter(Boolean);
-  if (!dayIds.length) return days.map((day) => ({ ...day, trip_stops: [] }));
-
-  const stopsResult = await admin
-    .from("trip_stops")
-    .select("*")
-    .in("day_id", dayIds)
-    .order("sort_order", { ascending: true })
-    .order("arrival_time", { ascending: true, nullsFirst: false });
-
-  const stopsTableMissing = stopsResult.error?.code === "PGRST205" || stopsResult.error?.code === "42P01";
-  if (stopsTableMissing) return days.map((day) => ({ ...day, trip_stops: [] }));
-  if (stopsResult.error) {
-    console.error("[get-shared-trip.loadItinerary.stops]", stopsResult.error);
-    return days.map((day) => ({ ...day, trip_stops: [] }));
-  }
-
-  const stopsByDay = new Map<string, Record<string, unknown>[]>();
-  (stopsResult.data || []).forEach((stop) => {
-    const dayId = String(stop.day_id || "");
-    if (!stopsByDay.has(dayId)) stopsByDay.set(dayId, []);
-    stopsByDay.get(dayId)?.push(stop);
-  });
-
-  return days.map((day) => ({
-    ...day,
-    trip_stops: stopsByDay.get(String(day.id)) || []
-  }));
+function publicPhotoMeta(photo: Record<string, unknown> | null, fallback: Record<string, unknown>) {
+  return {
+    id: photo?.id ?? null,
+    storage_path: photo?.storage_path || fallback.storage_path,
+    original_name: photo?.original_name || fallback.original_name || null,
+    caption: typeof photo?.caption === "string" ? photo.caption : ""
+  };
 }
 
 Deno.serve(async (request) => {
@@ -145,42 +63,132 @@ Deno.serve(async (request) => {
   if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
   if (!supabaseUrl || !serviceRoleKey) return jsonResponse({ error: "Function secrets are not configured" }, 500);
 
+  const uploadedPaths: string[] = [];
+  let failureStage = "request";
   try {
-    const body = await request.json().catch(() => ({}));
-    const token = String(body?.share_token || body?.token || "").trim();
+    failureStage = "parse-request";
+    const form = await request.formData();
+    const token = String(form.get("share_token") || form.get("token") || "").trim();
+    const formFiles = [...form.getAll("photos"), ...form.getAll("photo")];
+    const files = formFiles.filter((value): value is File => value instanceof File);
     if (!token || token.length > 200) return jsonResponse({ error: "Invalid share token" }, 400);
+    if (!files.length) return jsonResponse({ error: "Please upload at least one image" }, 400);
+    if (files.length > MAX_GUEST_UPLOAD_FILES) {
+      return jsonResponse({ error: `You can upload up to ${MAX_GUEST_UPLOAD_FILES} photos at a time` }, 400);
+    }
+    if (files.some((file) => !file.type.startsWith("image/"))) {
+      return jsonResponse({ error: "Please upload image files only" }, 400);
+    }
+    if (files.some((file) => file.size > 25 * 1024 * 1024)) {
+      return jsonResponse({ error: "Each photo must be 25 MB or smaller" }, 413);
+    }
 
-    const { data: trip, error } = await admin
+    failureStage = "load-trip";
+    const { data: trip, error: tripError } = await admin
       .from("trips")
       .select("*")
       .eq("share_token", token)
       .eq("is_shared", true)
       .maybeSingle();
-
-    if (error) {
-      console.error("[get-shared-trip.trip]", error);
-      return jsonResponse({ error: "Unable to load shared trip" }, 500);
-    }
+    if (tripError) return jsonResponse({ error: "Unable to load shared trip" }, 500);
     if (!trip) return jsonResponse({ error: "Shared trip not found" }, 404);
+    // Keep compatibility with trips created before the share-permission
+    // migration, which used allow_guest_upload instead.
+    const canGuestUpload = trip.can_guest_upload ?? trip.allow_guest_upload ?? false;
+    if (canGuestUpload !== true) return jsonResponse({ error: "Guest uploads are disabled" }, 403);
 
-    const photos = await loadPhotos(trip);
-    const tripDays = await loadItinerary(String(trip.id));
-    const { user_id: _userId, ...safeTrip } = trip;
-    const normalizedTrip = {
-      ...safeTrip,
-      title: trip.title ?? trip.name ?? null,
-      location_name: trip.location_name ?? trip.location ?? "",
-      travel_date: trip.travel_date ?? trip.date_start ?? null,
-      travel_date_end: trip.travel_date_end ?? trip.date_end ?? null,
-      photos,
-      trip_photos: photos,
-      trip_days: tripDays,
-      share_token: token
-    };
+    const photoRows: Record<string, unknown>[] = [];
+    failureStage = "storage-upload";
+    for (const file of files) {
+      const extension = extensionFor(file);
+      const storagePath = `${trip.user_id}/${trip.id}/${crypto.randomUUID()}.${extension}`;
+      const { error: uploadError } = await admin.storage
+        .from(photoBucket)
+        .upload(storagePath, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+      if (uploadError) {
+        console.error("[upload-shared-photo.storage]", uploadError);
+        throw new Error("Photo upload failed");
+      }
+      uploadedPaths.push(storagePath);
+      photoRows.push({
+        trip_id: trip.id,
+        // Owner uploads already populate this required column. Shared uploads
+        // still belong to the trip owner; the guest is not an authenticated DB user.
+        owner_id: trip.user_id,
+        storage_path: storagePath,
+        original_name: file.name
+      });
+    }
 
-    return jsonResponse(normalizedTrip);
+    failureStage = "photo-metadata-insert";
+    const modernResult = await admin
+      .from("trip_photos")
+      .insert(photoRows);
+
+    if (!modernResult.error) {
+      const photos = photoRows;
+      return jsonResponse({
+        ok: true,
+        count: photos.length,
+        photos: photos.map((photo) => publicPhotoMeta(photo, photo)),
+        photo: photos[0] ? publicPhotoMeta(photos[0], photos[0]) : null
+      });
+    }
+
+    const tableMissing = modernResult.error.code === "PGRST205" || modernResult.error.code === "42P01";
+    if (!tableMissing) {
+      console.error("[upload-shared-photo.metadata]", modernResult.error);
+      const metadataError = new Error("Photo metadata insert failed");
+      (metadataError as Error & { code?: string }).code = modernResult.error.code || "UNKNOWN";
+      throw metadataError;
+    }
+
+    failureStage = "legacy-metadata-update";
+    const photos = parsePhotosMeta(trip.photos_meta);
+    const legacyPhotos = files.map((file, index) => ({
+      path: uploadedPaths[index],
+      original_name: file.name,
+      caption: ""
+    }));
+    const { error: legacyError } = await admin
+      .from("trips")
+      .update({ photos_meta: JSON.stringify([...photos, ...legacyPhotos]), photo_count: photos.length + legacyPhotos.length })
+      .eq("id", trip.id);
+    if (legacyError) throw legacyError;
+
+    return jsonResponse({
+      ok: true,
+      count: legacyPhotos.length,
+      photos: legacyPhotos.map((photo) => publicPhotoMeta(null, photo)),
+      photo: publicPhotoMeta(null, legacyPhotos[0])
+    });
   } catch (error) {
-    console.error("[get-shared-trip]", error);
-    return jsonResponse({ error: "Unable to load shared trip" }, 500);
+    const detail = error instanceof Error ? error.message : String(error ?? "Unknown error");
+    const errorCode = typeof error === "object" && error && "code" in error
+      ? String((error as { code?: unknown }).code || "")
+      : "";
+    console.error("[upload-shared-photo]", { stage: failureStage, error: detail });
+    if (uploadedPaths.length) {
+      const { error: cleanupError } = await admin.storage.from(photoBucket).remove(uploadedPaths);
+      if (cleanupError) {
+        console.error("[ORPHAN PHOTO]", {
+          stage: failureStage,
+          paths: uploadedPaths,
+          error: cleanupError
+        });
+      }
+    }
+
+    const safeDetails = {
+      "storage-upload": "照片檔案儲存失敗，請確認照片格式、大小與 Storage 容量。",
+      "photo-metadata-insert": "照片檔案已上傳，但照片資料寫入失敗，請重新部署最新的 upload-shared-photo。",
+      "legacy-metadata-update": "照片資料寫入失敗，請確認 trips.photos_meta 欄位。"
+    };
+    return jsonResponse({
+      error: "Photo upload failed",
+      code: `GUEST_UPLOAD_${failureStage.replace(/-/g, "_").toUpperCase()}`,
+      diagnostic_code: errorCode || null,
+      detail: safeDetails[failureStage as keyof typeof safeDetails] || "分享照片服務發生錯誤，請稍後再試。"
+    }, 500);
   }
 });
