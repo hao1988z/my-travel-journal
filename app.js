@@ -3026,6 +3026,21 @@ async function saveTripGroup(event) {
   if (!title) return toast("請輸入大行程名稱");
   if (children.length < 2) return toast("請至少選擇兩個小行程");
 
+  const { error: parentColumnError } = await client
+    .from("trips")
+    .select("parent_trip_id")
+    .limit(1);
+  if (parentColumnError) {
+    const detail = [parentColumnError.message, parentColumnError.details, parentColumnError.hint]
+      .filter(Boolean)
+      .join(" · ");
+    const message = /parent_trip_id|schema cache|column .* does not exist/i.test(detail)
+      ? "大行程欄位尚未同步，請確認已在目前 Supabase 專案執行 20260825_trip_groups.sql，稍候再試。"
+      : detail || "無法檢查大行程欄位";
+    $("groupFormStatus").textContent = message;
+    return toast(message);
+  }
+
   const dates = children
     .flatMap((trip) => [trip.travel_date || trip.date_start, trip.travel_date_end || trip.date_end])
     .filter(Boolean)
@@ -3065,7 +3080,12 @@ async function saveTripGroup(event) {
       .eq("owner_id", state.user.id)
       .in("id", selectedIds)
       .select("id");
-    if (assignError) throw assignError;
+    if (assignError) {
+      const detail = [assignError.message, assignError.details, assignError.hint]
+        .filter(Boolean)
+        .join(" · ");
+      throw new Error(detail || "小行程分組寫入失敗");
+    }
     if (!Array.isArray(assigned) || assigned.length !== selectedIds.length) {
       throw new Error("小行程分組未完整寫入，請重新整理後再試");
     }
@@ -3076,9 +3096,13 @@ async function saveTripGroup(event) {
   } catch (error) {
     console.error("[saveTripGroup]", error);
     if (parent?.id) await deleteTripRow(parent.id);
-    const missingColumn = /parent_trip_id|column .* does not exist|schema cache/i.test(error.message || "");
-    toast(missingColumn ? "請先在 Supabase 執行 20260825_trip_groups.sql" : (error.message || "大行程建立失敗"));
-    $("groupFormStatus").textContent = "建立失敗，既有旅程沒有被修改。";
+    const detail = [error?.message, error?.details, error?.hint].filter(Boolean).join(" · ");
+    const missingColumn = /parent_trip_id|column .* does not exist|schema cache/i.test(detail);
+    const message = missingColumn
+      ? "大行程欄位尚未同步，請確認已在目前 Supabase 專案執行 20260825_trip_groups.sql，稍候再試。"
+      : detail || "大行程建立失敗";
+    toast(message);
+    $("groupFormStatus").textContent = "建立失敗：" + message + "。既有旅程沒有被修改。";
   } finally {
     if (submitButton) submitButton.disabled = false;
   }
