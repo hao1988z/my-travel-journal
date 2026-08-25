@@ -1442,7 +1442,9 @@ function renderTripDetail(trip) {
   $("detailPrivacy").textContent = trip.is_shared ? "已開啟分享" : "私人旅途";
   $("detailDownloadBtn").hidden = !cover;
   $("detailEditBtn").hidden = isGroup;
-  $("detailEditExpensesBtn").hidden = isGroup;
+  $("detailEditExpensesBtn").hidden = state.sharedMode || isGroup;
+  document.querySelector('[data-detail-tab="expenses"]')?.toggleAttribute("hidden", state.sharedMode);
+  $("detailOverviewExpenseSection")?.toggleAttribute("hidden", state.sharedMode);
   $("detailPhotoManagementActions").hidden = isGroup;
   const coverEditorButton = $("detailSetCoverBtn");
   if (coverEditorButton) {
@@ -2858,7 +2860,6 @@ function renderDrawer(trip, sharedMode) {
           <span><strong>${escapeHtml(groupSummary.start_date ? formatDate(groupSummary.start_date) : "未設定")}${groupSummary.end_date && groupSummary.end_date !== groupSummary.start_date ? ` — ${escapeHtml(formatDate(groupSummary.end_date))}` : ""}</strong><small>旅程日期</small></span>
           <span><strong>${Number(groupSummary.photo_count) || 0}</strong><small>張照片</small></span>
           <span><strong>${Number(groupSummary.diary_count) || 0}</strong><small>篇日記</small></span>
-          <span><strong>NT$ ${Math.round(Number(groupSummary.expense_total) || 0).toLocaleString("zh-TW")}</strong><small>旅程花費</small></span>
         </div>
         <div class="shared-child-trip-list" id="sharedChildTripList">
           ${childTrips.map((child) => `
