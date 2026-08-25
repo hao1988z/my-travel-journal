@@ -2828,6 +2828,7 @@ function renderDrawer(trip, sharedMode) {
         <input type="file" id="guestPhotoInput" accept="image/*" multiple>
         <small>選取後會先預覽，按「確認上傳」才會送出照片。</small>
         <div id="guestUploadPreview" class="guest-upload-preview" hidden></div>
+        <p id="guestUploadStatus" class="guest-upload-status" role="status" aria-live="polite"></p>
         <div class="guest-upload-actions">
           <button class="btn btn-primary" id="confirmGuestUploadBtn" type="button" disabled>確認上傳（0 張）</button>
           <button class="btn btn-soft" id="cancelGuestUploadBtn" type="button" hidden>取消選取</button>
@@ -4013,6 +4014,7 @@ function resetGuestUploadState({ clearInput = true } = {}) {
   const preview = $("guestUploadPreview");
   const confirmButton = $("confirmGuestUploadBtn");
   const cancelButton = $("cancelGuestUploadBtn");
+  const status = $("guestUploadStatus");
   if (preview) {
     preview.hidden = true;
     preview.innerHTML = "";
@@ -4022,6 +4024,17 @@ function resetGuestUploadState({ clearInput = true } = {}) {
     confirmButton.textContent = "確認上傳（0 張）";
   }
   if (cancelButton) cancelButton.hidden = true;
+  if (status) {
+    status.textContent = "";
+    status.dataset.state = "";
+  }
+}
+
+function setGuestUploadStatus(message, isError = false) {
+  const status = $("guestUploadStatus");
+  if (!status) return;
+  status.textContent = message || "";
+  status.dataset.state = message ? (isError ? "error" : "active") : "";
 }
 
 function renderGuestUploadPreview() {
@@ -4074,6 +4087,7 @@ function prepareGuestPhotos(event, shareToken, tripId) {
   state.pendingGuestUpload = { files, shareToken, tripId };
   state.pendingGuestPreviewUrls = files.slice(0, 12).map((file) => URL.createObjectURL(file));
   renderGuestUploadPreview();
+  setGuestUploadStatus(`已選取 ${files.length} 張照片，請按「確認上傳」開始。`);
 }
 
 async function uploadGuestPhotos(shareToken, tripId) {
@@ -4091,9 +4105,11 @@ async function uploadGuestPhotos(shareToken, tripId) {
   const cancelButton = $("cancelGuestUploadBtn");
 
   let uploadedCount = 0;
+  let completed = false;
   try {
     if (confirmButton) confirmButton.disabled = true;
     if (cancelButton) cancelButton.hidden = true;
+    setGuestUploadStatus(`照片上傳中：0 / ${files.length}`);
     for (let offset = 0; offset < files.length; offset += GUEST_UPLOAD_BATCH_SIZE) {
       const batch = files.slice(offset, offset + GUEST_UPLOAD_BATCH_SIZE);
       const form = new FormData();
@@ -4120,16 +4136,29 @@ async function uploadGuestPhotos(shareToken, tripId) {
       }
 
       uploadedCount += Number(payload.count) || batch.length;
+      setGuestUploadStatus(`照片上傳中：${uploadedCount} / ${files.length}`);
       toast(`補照片上傳中：${uploadedCount} / ${files.length}`);
     }
 
+    completed = true;
     toast(`${uploadedCount} 張照片已補上`);
+    setGuestUploadStatus(`${uploadedCount} 張照片已補上，正在重新整理相簿…`);
     await loadSharedTrip(shareToken, tripId);
   } catch (error) {
     console.error("[uploadGuestPhotos]", error);
-    toast(`照片上傳中斷：已完成 ${uploadedCount} / ${files.length} 張` + (error.message ? `。${error.message}` : ""));
+    const message = `照片上傳中斷：已完成 ${uploadedCount} / ${files.length} 張` + (error.message ? `。${error.message}` : "");
+    if (uploadedCount > 0 && state.pendingGuestUpload === pending) {
+      pending.files = files.slice(uploadedCount);
+    }
+    if (confirmButton) {
+      confirmButton.disabled = false;
+      confirmButton.textContent = `重試上傳（${pending.files.length} 張）`;
+    }
+    if (cancelButton) cancelButton.hidden = false;
+    setGuestUploadStatus(message, true);
+    toast(message);
   } finally {
-    resetGuestUploadState();
+    if (completed) resetGuestUploadState();
   }
 }
 

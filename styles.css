@@ -2243,6 +2243,22 @@ body.share-mode .detail-drawer {
   object-fit: cover;
 }
 
+.guest-upload-status {
+  min-height: 1.4em;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.guest-upload-status[data-state="error"] {
+  color: #a33d2d;
+}
+
+.guest-upload-status[data-state="active"] {
+  color: var(--accent-deep, #176d60);
+}
+
 .guest-upload-actions {
   display: flex;
   flex-wrap: wrap;
