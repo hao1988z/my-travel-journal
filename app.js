@@ -3026,21 +3026,6 @@ async function saveTripGroup(event) {
   if (!title) return toast("請輸入大行程名稱");
   if (children.length < 2) return toast("請至少選擇兩個小行程");
 
-  const { error: parentColumnError } = await client
-    .from("trips")
-    .select("parent_trip_id")
-    .limit(1);
-  if (parentColumnError) {
-    const detail = [parentColumnError.message, parentColumnError.details, parentColumnError.hint]
-      .filter(Boolean)
-      .join(" · ");
-    const message = /parent_trip_id|schema cache|column .* does not exist/i.test(detail)
-      ? "大行程欄位尚未同步，請確認已在目前 Supabase 專案執行 20260825_trip_groups.sql，稍候再試。"
-      : detail || "無法檢查大行程欄位";
-    $("groupFormStatus").textContent = message;
-    return toast(message);
-  }
-
   const dates = children
     .flatMap((trip) => [trip.travel_date || trip.date_start, trip.travel_date_end || trip.date_end])
     .filter(Boolean)
