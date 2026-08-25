@@ -230,11 +230,18 @@ function setupResendButton() {
 }
 
 function initMap() {
+  if (!window.L || !$("map")) {
+    console.warn("[initMap] Leaflet or map container is unavailable; continuing without the home map.");
+    map = null;
+    return false;
+  }
+
   map = L.map("map", { zoomControl: true }).setView([23.6, 121.0], 7);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "© OpenStreetMap",
     maxZoom: 19
   }).addTo(map);
+  return true;
 }
 
 async function signIn(event) {
@@ -1188,6 +1195,8 @@ function handleTripCardAction(tripId, action) {
 }
 
 function refreshMarkers() {
+  if (!map) return;
+
   state.markers.forEach((marker) => map.removeLayer(marker));
   state.markers.clear();
 
